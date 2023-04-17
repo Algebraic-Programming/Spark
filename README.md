@@ -28,7 +28,7 @@ we test our approach for Spark 3.x and more recent JDKs and Scala distributions.
 Therefore please consider this repository as a highly experimental code base, at
 present.
 
-[1] https://arxiv.org/abs/1906.03196initial
+[1] https://arxiv.org/abs/1906.03196
 
 
 Compile-time dependencies
