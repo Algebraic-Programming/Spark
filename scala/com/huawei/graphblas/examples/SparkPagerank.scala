@@ -18,11 +18,11 @@
 
 package com.huawei.graphblas.examples
 
-import sys.process._
-
 import scala.math.abs
 import scala.math.max
 import scala.math.sqrt
+
+import com.huawei.Utils
 
 import org.apache.spark.rdd.RDD
 import org.apache.spark.SparkConf
@@ -43,7 +43,7 @@ object SparkPagerank {
 		def numPartitions(): Int = P;
 	}
 
-	/** 
+	/**
 	 * Parses square non-symmetric MatrixMarket or csv files as
 	 * pattern matrices.
 	 *
@@ -95,8 +95,8 @@ object SparkPagerank {
 		sinks = sc.range( 0, n ).subtract( sinks );           //this is an RDD with element type Long, storing the sink IDs.
 		dangling = sc.range( 0, n ).subtract( dangling );     //this is an RDD with element type Long, storing the dangling node IDs.
 
- 		//make sure all (Key,Value) RDDs are partitioned equally
-//		val partitioner: CyclicPartitioner = new CyclicPartitioner( P, n );
+		//make sure all (Key,Value) RDDs are partitioned equally
+		//val partitioner: CyclicPartitioner = new CyclicPartitioner( P, n );
 		val partitioner = new HashPartitioner( P );
 		println( data.toDebugString );
 		data = data.partitionBy( partitioner );
@@ -131,14 +131,14 @@ object SparkPagerank {
 	}
 
 	/**
-         * This is a real PageRank implementation, in that it performs proper
-         * power iterations for the Google matrix as defined in e.g. Langville
-         * and Meyer (2011). It is significantly slower than the seemingly
-         * standard variant that does not account for dangling nodes, and thus
-         * does something that is \em not mathematically equivalent to the
-         * PageRank algorithm. This alternative algorithm is implemented in
-         * another example.
-         * 
+	 * This is a real PageRank implementation, in that it performs proper
+	 * power iterations for the Google matrix as defined in e.g. Langville
+	 * and Meyer (2011). It is significantly slower than the seemingly
+	 * standard variant that does not account for dangling nodes, and thus
+	 * does something that is \em not mathematically equivalent to the
+	 * PageRank algorithm. This alternative algorithm is implemented in
+	 * another example.
+	 *
 	 * \warning: the PageRank vector returned is persisted to memory!
 	 *
 	 * @param[in] verbosity 0 is silent, 1 is warnings, 2 is info,
@@ -170,7 +170,7 @@ object SparkPagerank {
 			var dangling: Double = 0.0;
 			if( matrix.num_sinks > 0 ) {
 				dangling = oldranks.filter( x => {           //x looks like (node_ID, old_pagerank_value)
-				  	sinkIDs.value.contains( x._1 )       //select only those old values that are sinks
+					sinkIDs.value.contains( x._1 )       //select only those old values that are sinks
 				} ).map( x => x._2 ).reduce( _ + _ );        //sum all old pagerank values of sink nodes
 			}
 			dangling = (alpha * dangling + alphainv) / matrix.n; //compute total contribution to each pagerank entry
@@ -187,7 +187,7 @@ object SparkPagerank {
 				}
 			).partitionBy( matrix.partitioner).union(            //we miss contributions from dangling nodes, so take union with those
 			  matrix.danglingKV.map( x => {                      //x looks like (Long,Double)
-			    (x._1, dangling)                                 //overwrite old value with static contribution
+				(x._1, dangling)                                 //overwrite old value with static contribution
 			  } ).partitionBy( matrix.partitioner )              //make sure the partition strategies match for the union operator
 			);
 
@@ -273,8 +273,8 @@ object SparkPagerank {
 
 		sc.setCheckpointDir( chkptdir );
 
-		val hostnames = sc.parallelize( 0 until P ).map{ pid => {"hostname"!!} }.collect().toArray
-		val mapper = new com.huawei.graphblas.PIDMapper( sc.parallelize( 0 until P ).map{ pid => {"hostname"!!} }.collect().toArray )
+		val hostnames = sc.parallelize( 0 until P ).map{ pid => {Utils.getHostname()} }.collect().toArray
+		val mapper = new com.huawei.graphblas.PIDMapper( sc.parallelize( 0 until P ).map{ pid => {Utils.getHostname()} }.collect().toArray )
 		val nodes = mapper.numProcesses()
 		println( s"I detected $nodes individual worker nodes." );
 

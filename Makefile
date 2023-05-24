@@ -15,13 +15,19 @@
 # limitations under the License.
 #
 
+include config.conf
+
 .PHONY: all clean install
 
 all: build/libsparkgrb.so build/graphBLAS.jar examples/examples.jar
 
-CXX=grbcxx -b hybrid
+GRBCXX=$(GRB_INSTALL_PATH)/bin/grbcxx
 
-CPPFLAGS=-O3 -DNDEBUG -g
+CXX=$(GRBCXX) -b $(GRB_BACKEND)
+
+JNI_INCLUDE=$(patsubst %/bin/javac, %, $(realpath $(shell which javac)))/include
+
+CPPFLAGS=-O3 -DNDEBUG -g -I $(JNI_INCLUDE) -I $(JNI_INCLUDE)/linux
 
 LFLAGS=
 
@@ -31,7 +37,7 @@ ${GRB_INSTALL_PATH}/lib/spark/%: build/%
 
 install: ${GRB_INSTALL_PATH}/lib/spark/libsparkgrb.so ${GRB_INSTALL_PATH}/lib/spark/graphBLAS.jar
 
-build/graphBLAS.jar: build/com/huawei/graphblas/Loader.class build/com/huawei/graphblas/Native.class build/com/huawei/GraphBLAS/package.class build/com/huawei/graphblas/PIDMapper.class
+build/graphBLAS.jar: build/com/huawei/Utils/package.class build/com/huawei/graphblas/Loader.class build/com/huawei/graphblas/Native.class build/com/huawei/GraphBLAS/package.class build/com/huawei/graphblas/PIDMapper.class
 	cd build; jar cf "../$@" com
 
 examples/examples.jar: examples/com/huawei/graphblas/examples/Initialise.class examples/com/huawei/graphblas/examples/SparkPagerank.class examples/com/huawei/graphblas/examples/Pagerank.class
@@ -53,7 +59,11 @@ build/com/huawei/graphblas/PIDMapper.class: java/com/huawei/graphblas/PIDMapper.
 	mkdir build || true
 	javac -cp java -d ./build "$<"
 
-build/com/huawei/GraphBLAS/package.class: scala/com/huawei/GraphBLAS.scala build/com/huawei/graphblas/Loader.class build/com/huawei/graphblas/Native.class build/com/huawei/graphblas/PIDMapper.class
+build/com/huawei/Utils/package.class: scala/com/huawei/Utils.scala
+	mkdir build || true
+	scalac -cp "build:${SPARK_HOME}/conf/:${SPARK_HOME}/jars/*" -d ./build "$<"
+
+build/com/huawei/GraphBLAS/package.class: scala/com/huawei/GraphBLAS.scala build/com/huawei/Utils/package.class build/com/huawei/graphblas/Loader.class build/com/huawei/graphblas/Native.class build/com/huawei/graphblas/PIDMapper.class
 	mkdir build || true
 	scalac -cp "build:${SPARK_HOME}/conf/:${SPARK_HOME}/jars/*" -d ./build "$<"
 
@@ -61,10 +71,10 @@ build/native.o: cpp/native.cpp build/com_huawei_graphblas_Native.h cpp/sparkgrb.
 	${CXX} ${CPPFLAGS} -fPIC -Ibuild/ -I${GRB_INSTALL_PATH}/include/:./cpp/ -c -o "$@" "$<"
 
 build/pagerank.o: cpp/pagerank.cpp cpp/sparkgrb.hpp
-	${CXX} ${CPPFLAGS} -Ibuild/ -I${GRB_INSTALL_PATH}/include/:./cpp/ -c -o "$@" "$<"
+	${CXX} ${CPPFLAGS} -fPIC -Ibuild/ -I${GRB_INSTALL_PATH}/include/:./cpp/ -c -o "$@" "$<"
 
 #This is an ugly workaround to an ALP bug (see GitHub issue 171)
-CMD:="$(shell ${CXX} -b hybrid --show ${LFLAGS})"
+CMD:="$(shell ${CXX} -b $(GRB_BACKEND) --show ${LFLAGS})"
 PREFIX:=$(shell echo "${CMD}" | sed 's/\(^.*reference_omp\).*/\1/')
 POSTFIX:=$(shell echo "${CMD}" | sed 's/^.*reference_omp\ \(.*\)/\1/')
 MPOSTFIX:=$(shell echo "${POSTFIX}" | sed 's/\.a/\.so/g')
@@ -74,7 +84,7 @@ build/libsparkgrb.so: build/native.o build/pagerank.o
 	# The following is bugged:
 	#${CXX} -shared -o "${@}" ${^}
 
-examples/com/huawei/graphblas/examples/%.class: scala/com/huawei/graphblas/examples/%.scala build/com/huawei/GraphBLAS/package.class build/com/huawei/graphblas/PIDMapper.class
+examples/com/huawei/graphblas/examples/%.class: scala/com/huawei/graphblas/examples/%.scala build/graphBLAS.jar
 	mkdir examples || true
 	scalac -cp "build:${SPARK_HOME}/conf/:${SPARK_HOME}/jars/*" -d ./examples "$<"
 

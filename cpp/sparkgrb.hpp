@@ -30,7 +30,7 @@
 #define FILE_LOGGING
 #endif
 
-#define FILE_LOGGING
+// #define FILE_LOGGING
 
 /** The persistent data that is passed around via Spark. */
 typedef grb::Launcher< grb::EXEC_MODE::MANUAL > Persistent;

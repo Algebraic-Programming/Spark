@@ -16,10 +16,9 @@
  */
 
 
-import sys.process._
-
 import org.apache.spark.rdd.RDD
 
+import com.huawei.Utils
 import com.huawei.graphblas.Native
 import com.huawei.graphblas.PIDMapper
 
@@ -68,7 +67,7 @@ package com.huawei {
 						val filtered = iterator.dropWhile( x => x.startsWith( "%" ) );
 						assert( filtered.hasNext ); //this could in principle fail if you are very very very unlucky. In that case, change the number of parts (decrease by 1, e.g.) and you should be fine.
 						val sz_header = filtered.next.split( " " );
-						println( sz_header.deep )
+						println( sz_header.flatten )
 						assert( sz_header.size == 3 );
 						Iterator((sz_header.apply(0).toLong, sz_header.apply(1).toLong, sz_header.apply(2).toLong))
 					} else {
@@ -124,7 +123,7 @@ package com.huawei {
 				case _ => throw new java.lang.Exception( "Cannot parse matrix market file at line " + x );
 			}
 		}
-		
+
 		/**
 		 * Given a 3-tuple in string form, translate it into one or two coordinate-
 		 * value pairs. One pair is returned if and only if its coordinates are
@@ -299,7 +298,7 @@ package com.huawei {
 			val fnRDD = sc.textFile( fn );
 			val header = parseHeader( fnRDD );
 			val parsed = filterHeader( fnRDD );
-			val ret = parsed.filter( x => !x.startsWith("%") ).flatMap( parseSymTriple ).groupBy( x => x._1 ).map( x => packTriples(x._1, x._2) ) 
+			val ret = parsed.filter( x => !x.startsWith("%") ).flatMap( parseSymTriple ).groupBy( x => x._1 ).map( x => packTriples(x._1, x._2) )
 			(header._1, header._2, header._3, ret)
 		}*/
 
@@ -314,17 +313,22 @@ package com.huawei {
 		 * @param[in] P The number of processes to be used.
 		 */
 		def initialize( sc: org.apache.spark.SparkContext, P: Int ) : Instance = {
-			val hostnames = sc.parallelize( 0 until P ).map{ pid => {"hostname"!!} }.collect().toArray;
-			println( hostnames.deep )
+
+			val hostnames = sc.parallelize( 0 until P ).map{ pid => {Utils.getHostname()} }.collect().toArray
+			println( "--->>> hostnames:")
+			val distinct_hostnames = hostnames.distinct
+			println( hostnames.distinct.toList )
+
 			val mapper = new PIDMapper( hostnames );
 			val detectedP = mapper.numProcesses();
 			val master = mapper.headnode();
 			println( s"I detected $detectedP hosts." )
 			println( s"I elected $master as head node." )
+
 			val bcmap = sc.broadcast( mapper )
 			val rdd_out = sc.parallelize( 0 until P ).map {
 				pid => {
-					val hostname: String = "hostname"!!;
+					val hostname: String = Utils.getHostname();
 					val s: Int = bcmap.value.processID( hostname );
 					var ret: (Int,Long) = (s,0);
 					if( bcmap.value.threadID( hostname ) == 0 ) {
@@ -332,8 +336,14 @@ package com.huawei {
 					}
 					ret
 				}
-			}
-			(P, bcmap, rdd_out.filter( x => x._2 != 0 ).collect().toArray)
+			}.filter( x => x._2 != 0 )
+			val results = rdd_out.collect().toArray
+			println("collected results:")
+			results.foreach( n => {
+				println("value: " + n)
+			})
+			val inst : Instance = (P, bcmap, results)
+			inst
 		}
 
 		/**
@@ -345,7 +355,7 @@ package com.huawei {
 		def exit( sc: org.apache.spark.SparkContext, instance: Instance ) : Unit = {
 			val rdd_out = sc.parallelize( 0 until instance._1 ).map {
 				pid => {
-					val hostname: String = "hostname"!!;
+					val hostname: String = Utils.getHostname();
 					val s: Int = instance._2.value.processID( hostname );
 					if( instance._2.value.threadID( hostname ) == 0 ) {
 						val pointer_array: Array[(Int,Long)] = instance._3.filter( _._1 == s );
@@ -371,7 +381,7 @@ package com.huawei {
 			val fn = sc.broadcast( filename );
 			val rdd_out = sc.parallelize( 0 until instance._1 ).map {
 				pid => {
-					val hostname: String = "hostname"!!;
+					val hostname: String = Utils.getHostname();
 					val s: Int = instance._2.value.processID( hostname );
 					var ret: Long = 0;
 					if( instance._2.value.threadID( hostname ) == 0 ) {
@@ -398,7 +408,7 @@ package com.huawei {
 		def max( sc: org.apache.spark.SparkContext, instance: Instance, vector: DenseVector ) : (Long, Double) = {
 			val rdd_out = sc.parallelize( 0 until instance._1 ).map {
 				pid => {
-					val hostname: String = "hostname"!!;
+					val hostname: String = Utils.getHostname();
 					val s: Int = instance._2.value.processID( hostname );
 					var index: Long = 0;
 					var value: Double = 0.0;
@@ -425,7 +435,7 @@ package com.huawei {
 		def destroy( sc: org.apache.spark.SparkContext, instance: Instance, vector: DenseVector ) : Unit = {
 			val rdd_out = sc.parallelize( 0 until instance._1 ).map {
 				pid => {
-					val hostname: String = "hostname"!!;
+					val hostname: String = Utils.getHostname();
 					val s: Int = instance._2.value.processID( hostname );
 					if( instance._2.value.threadID( hostname ) == 0 ) {
 						Native.destroyVector( vector.data(s) );
