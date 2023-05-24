@@ -18,16 +18,13 @@
 #include "com_huawei_graphblas_Native.h"
 #include "graphblas.hpp"
 #include "sparkgrb.hpp"
-//#include "graphblas/utils/parser/MatrixFileReader.hpp"
 
-#include <lpf/mpi.h>
-
-//#include <vector>
 #include <string>
 
 #include <assert.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <stdlib.h>
 
 /** LPF is not responsible for process management. */
 const int LPF_MPI_AUTO_INITIALIZE = 0;
@@ -38,7 +35,9 @@ JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_execIO( JNIEnv * env, j
 
 	// parse arguments
 #ifdef FILE_LOGGING
-	FILE * file = fopen( "/tmp/graphblastest.txt", "a" );
+	std::string fp = getenv("HOME");
+	fp += "/graphblastest.txt";
+	FILE * file = fopen( fp.c_str(), "a" );
 #endif
 	Persistent * const launcher_p = reinterpret_cast< Persistent * >( instance );
 #ifdef FILE_LOGGING

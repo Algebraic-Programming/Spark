@@ -18,12 +18,11 @@
 
 package com.huawei.graphblas.examples
 
-import sys.process._
-
 import org.apache.spark.SparkEnv
 import org.apache.spark.SparkConf
 import org.apache.spark.SparkContext
 
+import com.huawei.Utils
 import com.huawei.GraphBLAS
 
 object Pagerank {
@@ -45,12 +44,14 @@ object Pagerank {
 			return;
 		}
 		val sc = new SparkContext( new SparkConf().setAppName( "Spark GraphBLAS Pagerank" ) );
+
 		val P = args(0).toInt;
 		println( s"Using P = $P." );
 		val t0 = System.nanoTime();
-		val hostnames = sc.parallelize( 0 until P ).map{ pid => {(SparkEnv.get.executorId,"hostname"!!)} }.collect().toArray
+		val hostnames = sc.parallelize( 0 until P ).map{ pid => {(SparkEnv.get.executorId, Utils.getHostname())} }.collect().toArray
 		println("Manual hostnames gathering at start of example:")
-		println(hostnames.deep)
+		println(hostnames.map(t => t._2).flatten)
+
 		println("Now creating GraphBLAS launcher:")
 		val grb = com.huawei.GraphBLAS.initialize( sc, P )
 		println("grb instance contents:")
