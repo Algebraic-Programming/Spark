@@ -15,9 +15,7 @@
  limitations under the License.
 
 
-Introduction
-============
-
+# Introduction
 This is an update of a very early version of GraphBLAS-accelerated Spark, first
 presented by Suijlen and Yzelman in 2019 [1]. This version now compiles against
 ALP v0.7. This code is a starting point for developing ALP/Spark, which is to be
@@ -30,32 +28,138 @@ present.
 
 [1] https://arxiv.org/abs/1906.03196
 
+At present, this code was tested to work with ALP shared-memory backend; testing
+with the hybrid backend is ongoing.
 
-Compile-time dependencies
-=========================
+# Compile-time dependencies
 
- * JDK 8 or higher
- * Spark 2.3.1 jars
- * Scala SDK version 2.11 (depends on the Spark version)
- * An MPI implementation, such as MPICH
+* ALP
+* JDK 11 or higher
+* Scala SDK version 2.13
+* Apache Spark 3.4
 
+# Prerequisites
 
-Compilation & installation
-==========================
+## ALP
+You can install and build ALP from the [GitHub repository](https://github.com/Algebraic-Programming/ALP.git),
+following the instructions in [its README](https://github.com/Algebraic-Programming/ALP#readme).
+In summary, you should clone, configure, build and install it according to a
+usual CMake workflow:
 
-Issue `make' to produce build/graphBLAS.jar and build/graphBLAS.so.
+```bash
+git clone https://github.com/Algebraic-Programming/ALP
+cd ALP
+mkdir build
+cd build
+mkdir install # installation directory
+../bootstrap.sh --prefix=./install
+make -j$(nproc)
+make install -j$(nproc)
+```
 
-Put graphBLAS.jar in ${SPARK_HOME}/jars/ and make sure that directory is synced
-across all workers when using Spark in cluster mode.
+Note that you can change the argument of the `--prefix` option to install ALP in
+any (empty) folder you may choose. For simplicity, from now on we will call this
+path `GRB_INSTALL_PATH`.
 
-Put the graphBLAS.so file in a path of your choosing and configure Spark to add
-your chosen path to its LD_LIBRARY_PATH. (TODO: check and add exactly how this
-is done.)
+## JDK 11
+You may tipically install JDK 11 from the packge management tool of your Linux
+distribution; e.g., in Ubuntu 20.04 `apt-get install openjdk-11-jdk`. As an
+alternative, you can download it from the
+[Oracle website](https://www.oracle.com/java/technologies/javase/jdk11-archive-downloads.html)
+and then add it conveniently to your `PATH` environment variable.
 
+The build infrastructure assumes the `javac` command is available in the
+environment.
 
-Run-time dependencies
-=====================
+## Scala 2.13
+You can follow the [dedicated guide](https://www.scala-lang.org/download/2.13.0.html)
+to install it and add it to your environment, in particular
+[via the Coursier CLI](https://docs.scala-lang.org/getting-started/index.html#using-the-scala-installer-recommended-way).
 
- * JRE 8 or higher
- * Spark 2.3.1 standalone or cluster
+The build infrastructure assumes the `scalac` command is available in the
+environment.
 
+## Apache Spark 3.4
+You may follow the [official download instructions](https://spark.apache.org/downloads.html),
+in particular selecting the package prebuilt for Scala 2.13 (2nd step of the
+selection procedure). A direct link to the file is
+https://dlcdn.apache.org/spark/spark-3.4.0/spark-3.4.0-bin-hadoop3-scala2.13.tgz
+(may change over time though).
+
+Once you have downloaded the package, you can extract it via the `tar` utility,
+e.g.:
+
+```bash
+tar -xf spark-3.4.0-bin-hadoop3-scala2.13.tgz
+```
+
+This extracts a directory `spark-3.4.0-bin-hadoop3-scala2.13`, whose path we
+will from now on indicate with `SPARK_HOME`. Inside this
+path should be all the Spark components:
+
+```bash
+ls $SPARK_HOME
+LICENSE  NOTICE  R  README.md  RELEASE  bin  conf  data  examples  jars  kubernetes  licenses  logs  python  sbin  work  yarn
+```
+
+# Compilation & installation
+You should first clone this repository on this branch and enter the folder, if
+you haven't done so yet:
+
+```bash
+git clone -b https://github.com/Algebraic-Programming/Spark.git
+cd Spark
+ALP_SPARK_PATH=$(pwd)
+```
+
+From now on, we will assume the ALP/Spark prototype to be in the directory
+`ALP_SPARK_PATH`.
+
+To compile the ALP/Spark prototype, two steps are needed, namely *configuration*
+and *compilation*. These are detailed in the following.
+
+## Configuration
+ALP/Spark needs to know the path of the Spark installation and of the ALP
+installation. Both paths should be manually written in the file
+`${ALP_SPARK_PATH}/config.conf`, as values for the variables `SPARK_HOME` and
+`GRB_INSTALL_PATH`, respectively. Other variables usually do not need changes.
+You may refer to the comments inside `${ALP_SPARK_PATH}/config.conf` for more
+details.
+
+## Compilation
+Simply issue `make` to produce `build/graphBLAS.jar` and `build/graphBLAS.so`.
+
+# Running examples
+You first need to start Apache Spark in standalone or cluster mode, for which
+you may refer to the [official guide](https://spark.apache.org/docs/latest/).
+This example currently supports only the ALP shared-memory backend, which means
+that one worker only is supported. In particular, the easiest way is to
+[start it standalone](https://spark.apache.org/docs/latest/spark-standalone.html#starting-a-cluster-manually),
+for example:
+
+```bash
+${SPARK_HOME}/sbin/start-master.sh
+${SPARK_HOME}/sbin/start-worker.sh http://$(hostname):7077
+```
+
+Then you can submit ALP/Spark jobs to this master as normal Spark jobs, with
+some additional options for Spark to locate the binary and JAR files generated
+during compilation. The script `${ALP_SPARK_PATH}/run_examples.sh` shows
+these variables and automates their generation; you may refer to it for more
+details. This script also contains three examples, one of which is run. This
+example runs the PageRank algorithm on a matrix ingested from an input file
+via ALP, resulting in much faster runtime compared to the pure Spark
+implementation (second example -- commented). The example matrix used in the
+script is [gyro_m from the SuitSparse Matrix Collection](https://sparse.tamu.edu/Oberwolfach/gyro_m),
+read in `Matrix Market` format.
+The quickest way to run the example is
+
+```bash
+cd ${ALP_SPARK_PATH}
+wget https://suitesparse-collection-website.herokuapp.com/MM/Oberwolfach/gyro_m.tar.gz
+tar -xf gyro_m.tar.gz
+./run_example.sh
+```
+
+Then, you may see the Spark log on the standard output, with information about
+the PageRank results.
