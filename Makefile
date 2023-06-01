@@ -25,7 +25,7 @@ GRBCXX=$(GRB_INSTALL_PATH)/bin/grbcxx
 
 CXX=$(GRBCXX) -b $(GRB_BACKEND)
 
-JNI_INCLUDE=$(patsubst %/bin/javac, %, $(realpath $(shell which javac)))/include
+JNI_INCLUDE=$(patsubst %/bin/javac, %, $(realpath $(shell which $(JAVAC))))/include
 
 CPPFLAGS=-O3 -DNDEBUG -g -I $(JNI_INCLUDE) -I $(JNI_INCLUDE)/linux
 
@@ -45,27 +45,27 @@ examples/examples.jar: examples/com/huawei/graphblas/examples/Initialise.class e
 
 build/com_huawei_graphblas_Native.h: java/com/huawei/graphblas/Native.java java/com/huawei/graphblas/Loader.java
 	mkdir build || true
-	javac -cp java -d ./build -h ./build "$<"
+	$(JAVAC) -cp java -d ./build -h ./build "$<"
 
 build/com/huawei/graphblas/Loader.class: java/com/huawei/graphblas/Loader.java
 	mkdir build || true
-	javac -cp java -d ./build -h ./build "$<"
+	$(JAVAC) -cp java -d ./build -h ./build "$<"
 
 build/com/huawei/graphblas/Native.class: java/com/huawei/graphblas/Native.java
 	mkdir build || true
-	javac -cp java -d ./build "$<"
+	$(JAVAC) -cp java -d ./build "$<"
 
 build/com/huawei/graphblas/PIDMapper.class: java/com/huawei/graphblas/PIDMapper.java
 	mkdir build || true
-	javac -cp java -d ./build "$<"
+	$(JAVAC) -cp java -d ./build "$<"
 
 build/com/huawei/Utils/package.class: scala/com/huawei/Utils.scala
 	mkdir build || true
-	scalac -cp "build:${SPARK_HOME}/conf/:${SPARK_HOME}/jars/*" -d ./build "$<"
+	$(SCALAC) -cp "build:${SPARK_HOME}/conf/:${SPARK_HOME}/jars/*" -d ./build "$<"
 
 build/com/huawei/GraphBLAS/package.class: scala/com/huawei/GraphBLAS.scala build/com/huawei/Utils/package.class build/com/huawei/graphblas/Loader.class build/com/huawei/graphblas/Native.class build/com/huawei/graphblas/PIDMapper.class
 	mkdir build || true
-	scalac -cp "build:${SPARK_HOME}/conf/:${SPARK_HOME}/jars/*" -d ./build "$<"
+	$(SCALAC) -cp "build:${SPARK_HOME}/conf/:${SPARK_HOME}/jars/*" -d ./build "$<"
 
 build/native.o: cpp/native.cpp build/com_huawei_graphblas_Native.h cpp/sparkgrb.hpp
 	${CXX} ${CPPFLAGS} -fPIC -Ibuild/ -I${GRB_INSTALL_PATH}/include/:./cpp/ -c -o "$@" "$<"
@@ -86,7 +86,7 @@ build/libsparkgrb.so: build/native.o build/pagerank.o
 
 examples/com/huawei/graphblas/examples/%.class: scala/com/huawei/graphblas/examples/%.scala build/graphBLAS.jar
 	mkdir examples || true
-	scalac -cp "build:${SPARK_HOME}/conf/:${SPARK_HOME}/jars/*" -d ./examples "$<"
+	$(SCALAC) -cp "build:${SPARK_HOME}/conf/:${SPARK_HOME}/jars/*" -d ./examples "$<"
 
 clean:
 	rm -r build
