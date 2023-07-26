@@ -249,12 +249,14 @@ object SparkPagerank {
 			println( s" Experiment $i: $time_taken seconds. Checksum: $checksum" );
 		}
 		val avg_time: Double = times.sum / times.size;
-		if (times.size > 1)
+		if (times.size > 1) {
 			val sstddev:  Double = sqrt( times.map( x => (x - avg_time) * (x - avg_time) ).sum / (times.size-1) )
 			println( s"Average time taken: $avg_time seconds.\nSample standard deviation: $sstddev" );
-		else
+		}
+		else {
 			val t = times(0)
 			println( s"Time taken for experiment: $t seconds." );
+		}
 	}
 
 	def main( args: Array[String] ): Unit = {

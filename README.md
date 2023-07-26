@@ -138,7 +138,8 @@ You may refer to the comments inside `${ALP_SPARK_PATH}/config.conf` for more
 details.
 
 ## Compilation
-Simply issue `make` to produce `build/graphBLAS.jar` and `build/libsparkgrb.so`.
+Simply issue `make` from `ALP_SPARK_PATH` to produce both
+`build/graphBLAS.jar` and `build/libsparkgrb.so`.
 
 # Running examples
 You first need to start Apache Spark in standalone or cluster mode, for which
