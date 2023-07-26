@@ -30,6 +30,10 @@ public class Native implements Serializable {
 	/** Supported GraphBLAS program: PageRank. */
 	public static final int PAGERANK_GRB_IO = 0;
 
+	static {
+		System.loadLibrary( "sparkgrb" );
+	}
+
 	/**
 	 * Initialises the GraphBLAS back-end.
 	 *
@@ -45,7 +49,6 @@ public class Native implements Serializable {
 	 * @returns An instance pointer used to start GraphBLAS programs.
 	 */
 	public static long begin( String master, int s, int P ) {
-		System.loadLibrary( "sparkgrb" );
 		return start( master, s, P );
 	}
 

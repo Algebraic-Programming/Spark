@@ -93,7 +93,7 @@ void grb_pagerank( const GrB_Input &data_in, GrB_Output &out ) {
 		out.error_code = grb::algorithms::simple_pagerank< grb::descriptors::no_operation >(
 			pr, L,
 			workspace1, workspace2, workspace3,
-			0.85, .00000001, 10,
+			0.85, .00000001, 100,
 			&( out.iterations ), &( out.residual )
 		);
 		if( out.error_code != grb::SUCCESS ) {
