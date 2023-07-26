@@ -36,6 +36,7 @@ with the hybrid backend is ongoing.
 * ALP
 * JDK 11 or higher
 * Scala SDK version 2.13
+* SBT 1.0.0 or higher
 * Apache Spark 3.4
 
 # Prerequisites
@@ -62,11 +63,11 @@ any (empty) folder you may choose. For simplicity, from now on we will call this
 path `GRB_INSTALL_PATH`.
 
 ## JDK 11
-You may tipically install JDK 11 from the packge management tool of your Linux
+You may typically install JDK 11 from the packge management tool of your Linux
 distribution; e.g., in Ubuntu 20.04 `apt-get install openjdk-11-jdk`. As an
 alternative, you can download it from the
 [Oracle website](https://www.oracle.com/java/technologies/javase/jdk11-archive-downloads.html)
-and then add it conveniently to your `PATH` environment variable.
+and then add it to your `PATH` environment variable.
 
 The build infrastructure assumes the `javac` command is available in the
 environment.
@@ -79,12 +80,20 @@ to install it and add it to your environment, in particular
 The build infrastructure assumes the `scalac` command is available in the
 environment.
 
+## SBT
+You may install SBT following [the official guide](https://www.scala-sbt.org/1.x/docs/Installing-sbt-on-Linux.html), or install it using the `Coursier` tool you may have
+used for Scala, with `cs install sbt`.
+
 ## Apache Spark 3.4
 You may follow the [official download instructions](https://spark.apache.org/downloads.html),
 in particular selecting the package prebuilt for Scala 2.13 (2nd step of the
 selection procedure). A direct link to the file is
 https://dlcdn.apache.org/spark/spark-3.4.0/spark-3.4.0-bin-hadoop3-scala2.13.tgz
-(may change over time though).
+(may change over time though), e.g.:
+
+```bash
+wget https://dlcdn.apache.org/spark/spark-3.4.0/spark-3.4.0-bin-hadoop3-scala2.13.tgz
+```
 
 Once you have downloaded the package, you can extract it via the `tar` utility,
 e.g.:
@@ -107,7 +116,7 @@ You should first clone this repository on this branch and enter the folder, if
 you haven't done so yet:
 
 ```bash
-git clone -b https://github.com/Algebraic-Programming/Spark.git
+git clone -b latest_scala https://github.com/Algebraic-Programming/Spark.git
 cd Spark
 ALP_SPARK_PATH=$(pwd)
 ```
@@ -120,14 +129,16 @@ and *compilation*. These are detailed in the following.
 
 ## Configuration
 ALP/Spark needs to know the path of the Spark installation and of the ALP
-installation. Both paths should be manually written in the file
+installation.
+Both paths should be manually written in the file
 `${ALP_SPARK_PATH}/config.conf`, as values for the variables `SPARK_HOME` and
-`GRB_INSTALL_PATH`, respectively. Other variables usually do not need changes.
+`GRB_INSTALL_PATH`, respectively.
+Other variables usually do not need changes.
 You may refer to the comments inside `${ALP_SPARK_PATH}/config.conf` for more
 details.
 
 ## Compilation
-Simply issue `make` to produce `build/graphBLAS.jar` and `build/graphBLAS.so`.
+Simply issue `make` to produce `build/graphBLAS.jar` and `build/libsparkgrb.so`.
 
 # Running examples
 You first need to start Apache Spark in standalone or cluster mode, for which
@@ -144,14 +155,16 @@ ${SPARK_HOME}/sbin/start-worker.sh http://$(hostname):7077
 
 Then you can submit ALP/Spark jobs to this master as normal Spark jobs, with
 some additional options for Spark to locate the binary and JAR files generated
-during compilation. The script `${ALP_SPARK_PATH}/run_examples.sh` shows
-these variables and automates their generation; you may refer to it for more
-details. This script also contains three examples, one of which is run. This
-example runs the PageRank algorithm on a matrix ingested from an input file
-via ALP, resulting in much faster runtime compared to the pure Spark
-implementation (second example -- commented). The example matrix used in the
-script is [gyro_m from the SuitSparse Matrix Collection](https://sparse.tamu.edu/Oberwolfach/gyro_m),
-read in `Matrix Market` format.
+during compilation.
+The script `${ALP_SPARK_PATH}/run_examples.sh` shows these variables and
+automates their generation; you may refer to it for more details.
+This script also contains three examples, one of which is run.
+This example runs the PageRank algorithm on a matrix ingested from an input
+file via ALP, resulting in much faster runtime compared to the pure Spark
+implementation (second example -- commented).
+The example matrix used in the script is
+[gyro_m from the SuitSparse Matrix Collection](https://sparse.tamu.edu/Oberwolfach/gyro_m),
+in `Matrix Market` format.
 The quickest way to run the example is
 
 ```bash
