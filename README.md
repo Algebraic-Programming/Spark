@@ -185,7 +185,7 @@ example
 
 ```bash
 cd ${ALP_SPARK_PATH}
-run_examples.sh 2
+./run_examples.sh 2
 ```
 
 If no number is passed, example 1 is run by default.

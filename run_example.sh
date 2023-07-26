@@ -2,15 +2,17 @@
 
 example_num=$1
 
+if [[ -z "${example_num}" ]]; then
+    example_num=1
+fi
+
 re='^[0-9]+$'
 if [[ ! "${example_num}" =~ ${re} ]] ; then
    echo "error: argument is not a number"
    exit 1
 fi
 
-if [[ -z "${example_num}" ]]; then
-    example_num=1
-fi
+
 
 if ((example_num < 1 || example_num > 3)); then
     echo "select an example between 1 and 3"
