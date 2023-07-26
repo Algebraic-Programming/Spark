@@ -230,11 +230,11 @@ object SparkPagerank {
 		val read_time_taken = (System.nanoTime() - time) / 1000000000.0;
 		println( s"Time taken for matrix load: $read_time_taken" );
 
-		val times: Array[Double] = new Array[Double]( 5 );
+		val times: Array[Double] = new Array[Double]( 3 );
 
 		println( "Starting dry run using default parameters..." );
 		val dry_t0 = System.nanoTime();
-		flops( sc, matrix, 0.85, 100, 0.0000000001, 30, 4 ).unpersist();
+		flops( sc, matrix, 0.85, 10, 0.0000000001, 30, 4 ).unpersist();
 		val dry_t1 = (System.nanoTime() - dry_t0) / 1000000000.0;
 		println( s"Time taken for dry run: $dry_t1 seconds." );
 
