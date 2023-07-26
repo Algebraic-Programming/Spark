@@ -144,35 +144,49 @@ Simply issue `make` to produce `build/graphBLAS.jar` and `build/libsparkgrb.so`.
 You first need to start Apache Spark in standalone or cluster mode, for which
 you may refer to the [official guide](https://spark.apache.org/docs/latest/).
 This example currently supports only the ALP shared-memory backend, which means
-that one worker only is supported. In particular, the easiest way is to
+that one worker only is supported.
+In particular, the easiest way is to
 [start it standalone](https://spark.apache.org/docs/latest/spark-standalone.html#starting-a-cluster-manually),
 for example:
 
 ```bash
 ${SPARK_HOME}/sbin/start-master.sh
-${SPARK_HOME}/sbin/start-worker.sh http://$(hostname):7077
+${SPARK_HOME}/sbin/start-worker.sh spark://$(hostname):7077
 ```
 
 Then you can submit ALP/Spark jobs to this master as normal Spark jobs, with
 some additional options for Spark to locate the binary and JAR files generated
 during compilation.
+
 The script `${ALP_SPARK_PATH}/run_examples.sh` shows these variables and
 automates their generation; you may refer to it for more details.
-This script also contains three examples, one of which is run.
-This example runs the PageRank algorithm on a matrix ingested from an input
-file via ALP, resulting in much faster runtime compared to the pure Spark
-implementation (second example -- commented).
-The example matrix used in the script is
+This script also contains three examples of Spark jobs:
+
+1. an initialization job that only ensures the infrastructure works correctly
+2. an implementation of PageRank in pure Spark, analyzing an input graph from command line
+3. an implementation of PageRank in ALP, analyzing an input graph from command line
+
+Examples 2 and 3 run the PageRank algorithm on a matrix ingested from an input
+file; the example uses the
 [gyro_m from the SuitSparse Matrix Collection](https://sparse.tamu.edu/Oberwolfach/gyro_m),
 in `Matrix Market` format.
-The quickest way to run the example is
+The quickest way to get it is
 
 ```bash
 cd ${ALP_SPARK_PATH}
 wget https://suitesparse-collection-website.herokuapp.com/MM/Oberwolfach/gyro_m.tar.gz
 tar -xf gyro_m.tar.gz
-./run_example.sh
 ```
 
-Then, you may see the Spark log on the standard output, with information about
-the PageRank results.
+Once the matrix is downloaded and extracted, you may select the example to run
+by passing the number to the `${ALP_SPARK_PATH}/run_examples.sh` script, for
+example
+
+```bash
+cd ${ALP_SPARK_PATH}
+run_examples.sh 2
+```
+
+If no number is passed, example 1 is run by default.
+If you run a PageRank implementation, you may see the Spark log on the standard
+output, with information about the PageRank results.

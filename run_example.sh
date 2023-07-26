@@ -1,5 +1,22 @@
 #!/bin/bash
 
+example_num=$1
+
+re='^[0-9]+$'
+if [[ ! "${example_num}" =~ ${re} ]] ; then
+   echo "error: argument is not a number"
+   exit 1
+fi
+
+if [[ -z "${example_num}" ]]; then
+    example_num=1
+fi
+
+if ((example_num < 1 || example_num > 3)); then
+    echo "select an example between 1 and 3"
+    exit 1
+fi
+
 CDIR="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
 source ${CDIR}/config.conf
@@ -11,16 +28,31 @@ ALP_BIN_PATHS="--conf spark.executor.extraLibraryPath=${GRB_INSTALL_PATH}/lib:${
 ALP_BIN_JARS="--jars ${CDIR}/build/graphBLAS.jar"
 
 # main command
-CMD="${SPARK_HOME}/bin/spark-submit ${ALP_BIN_PATHS} ${ALP_BIN_JARS} --master spark://$(hostname):7077"
+CMD_BASE="${SPARK_HOME}/bin/spark-submit ${ALP_BIN_PATHS} ${ALP_BIN_JARS} --master spark://$(hostname):7077"
 
-### UNCOMMENT THE EXAMPLE YOU WANT TO RUN
+case "${example_num}" in
+# Example 0: test only initialization for ALP/Spark
+    1)
+        ARGS="--class com.huawei.graphblas.examples.Initialise build/examples.jar 1"
+        ;;
+# Example 1: run PageRank in pure Spark implementation
+    2)
+        ARGS="--class com.huawei.graphblas.examples.SparkPagerank build/examples.jar 1 $(pwd) $(pwd)/gyro_m/gyro_m.mtx"
+        ;;
+# Example 2: run Pagerank in ALP/Spark implementation
+    3)
+        ARGS="--class com.huawei.graphblas.examples.Pagerank build/examples.jar 1 $(pwd)/gyro_m/gyro_m.mtx"
+        ;;
+    *)
+        echo "unknown example number: ${example_num}"
+        exit 1
+        ;;
+esac
 
-# test only initialization for ALP/Spark
-# ${CMD} --class com.huawei.graphblas.examples.Initialise examples/examples.jar 1
+CMD="${CMD_BASE} ${ARGS}"
 
-# run PageRank in pure Spark implementation
-# ${CMD} --class com.huawei.graphblas.examples.SparkPagerank examples/examples.jar 1 $(pwd) $(pwd)/gyro_m/gyro_m.mtx
+echo "Running: ===>"
+echo ${CMD}
+echo "<==="
 
-# run Pagerank in ALP/Spark implementation
-${CMD} --class com.huawei.graphblas.examples.Pagerank examples/examples.jar 1 $(pwd)/gyro_m/gyro_m.mtx
-
+${CMD}
