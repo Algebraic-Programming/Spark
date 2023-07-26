@@ -51,7 +51,7 @@ public class PIDMapper implements Serializable {
 	private static final long serialVersionUID = 1L;
 
 	/** Used to assign unique thread IDs. */
-	private int counter;
+	private volatile int counter;
 
 	/** Records the total number of Spark executors. */
 	private int N;
@@ -77,17 +77,16 @@ public class PIDMapper implements Serializable {
 	 * A call to this function will sort the \a hostnames. If there are a
 	 * great many hostnames this function may need revision.
 	 */
-	public PIDMapper( String hostnames[] ) {
+	public PIDMapper( String hostnames[], String _master ) {
 		counter = 0;
 		N = hostnames.length;
+		master = _master;
 		if( N == 0 ) {
-			master = null;
 			P = 0;
 		} else {
 			Arrays.sort( hostnames, null );
 			s = new HashMap< String, Integer >();
 			s.put( hostnames[0], 0 );
-			master = hostnames[0];
 			P = 1;
 			T = new ArrayList< Integer >();
 			T.add( 1 );
@@ -110,14 +109,14 @@ public class PIDMapper implements Serializable {
 	 *
 	 * @returns A unique host ID.
 	 */
-	public synchronized int threadID( String hostname ) {
-		int ret = counter;
-		++counter;
-		if( counter == numThreads( hostname ) ) {
-			counter = 0;
-		}
-		return ret;
-	}
+	// public synchronized int threadID( String hostname ) {
+	// 	int ret = counter;
+	// 	++counter;
+	// 	if( counter == numThreads( hostname ) ) {
+	// 		counter = 0;
+	// 	}
+	// 	return ret;
+	// }
 
 	/**
 	 * Used to retrieve the total number of threads at a given host.

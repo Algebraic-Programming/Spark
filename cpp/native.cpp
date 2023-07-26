@@ -25,9 +25,16 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <fstream>
+#include <atomic>
+#include <mutex>
+#include <condition_variable>
+
+#include <sys/types.h>
+#include <fstream>
 
 /** LPF is not responsible for process management. */
-const int LPF_MPI_AUTO_INITIALIZE = 0;
+// const int LPF_MPI_AUTO_INITIALIZE = 0;
 
 JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_execIO( JNIEnv * env, jclass classDef, jlong instance, jint program, jstring filename ) {
 	(void)classDef;
@@ -112,55 +119,30 @@ JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_start( JNIEnv * env, jc
 		"hostname string I am passing to bsp_mpi_initialize_over_tcp is %s, and I "
 		"am hardcoded to try port 7177. My LPF ID is %d, and the expected number "
 		"of LPF processes is %d\n",
-		getpid(), "192.168.1.11", pid, P ); // hostname_c );
+		getpid(), hostname_str, pid, P ); // hostname_c );
 	(void)fflush( file );
 #endif
 	std::string hostname_str = hostname_c;
-	Persistent * const ret = new Persistent( pid, P, "192.168.1.11", "7177" );
-	assert( ret != NULL );
 	env->ReleaseStringUTFChars( hostname, hostname_c );
+	std::string fn = "/home/ascolari/Projects/ALP-Spark/app-" + std::to_string(pid) + ".log";
+	std::ofstream myfile(fn);
+	myfile << "hostname is " << hostname_str << std::endl;
+	myfile << "PID is " << getpid() << std::endl;
+	myfile << "ID is " << pid << " out of " << P << std::endl;
+	// return 0;
+	// sleep( 60 );
+	myfile << "connecting to " << hostname_str << std::endl;
+	Persistent * const ret = new Persistent( pid, P, hostname_str, "7177", true );
+	myfile << "connected to " << hostname_str << std::endl;
+	int world_size, flag;
+	MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+	myfile << "seeing " << world_size << std::endl;
+	MPI_Initialized( &flag );
+	myfile << "MPI is inited: " << ( flag ? "TRUE" : "FALSE" ) << std::endl;
+	assert( ret != NULL );
 #ifdef FILE_LOGGING
 	// do some logging
 	(void)fprintf( file, "Launcher instance @ %p\n", ret );
-#endif
-
-// TEST
-#if 0
-	GrB_Input in;
-	//(void) strncpy( &(in.data[0]), "/scratch/cage15.mtx", 20 );
-	(void) strncpy( &(in.data[0]), "/scratch/uk-2002/uk-2002.mtx", 29 );
-	//(void) strncpy( &(in.data[0]), "/scratch/clueweb12.mtx", 23 );
-	//(void) strncpy( &(in.data[0]), "/scratch/kmer_A2a/kmer_A2a.mtx", 31 );
-	in.program = PAGERANK_GRB_IO;
-
-	GrB_Output out;
-	out.error_code = grb::SUCCESS;
-	out.iterations = 0;
-	out.residual = 0.0;
-
-#ifdef FILE_LOGGING
-	(void) fprintf( file, "Input and output structs have been initialised, now passing to grbProgram...\n" );
-	(void) fclose( file );
-#endif
-
-	ret->exec( &grbProgram, in, out, true );
-
-#ifdef FILE_LOGGING
-	file = fopen( "/tmp/graphblastest.txt", "a" );
-	std::string error = grb::toString( out.error_code );
-	(void) fprintf( file, "Back in native PageRank function. Error code returned: %s\n", error.c_str() );
-	(void) fprintf( file, "Number of iterations: %zd\n", out.iterations );
-	(void) fprintf( file, "Final residual: %.10e\n", out.residual );
-	(void) fprintf( file, "PinnedVector @ %p\n", out.pinnedVector );
-	(void) fprintf( file, "First 10 vector entries:\n" );
-	for( size_t i = 0; i < 10 && i < out.pinnedVector->length(); ++i ) {
-		(void) fprintf( file, " (%zd, %.10e)\n", out.pinnedVector->index(i), out.pinnedVector->operator[](i) );
-	}
-#endif
-#endif
-	// END TEST
-
-#ifdef FILE_LOGGING
 	(void)fclose( file );
 #endif
 	return reinterpret_cast< long >( ret );
@@ -354,3 +336,44 @@ JNIEXPORT jdouble JNICALL Java_com_huawei_graphblas_Native_getValue( JNIEnv * en
 	return static_cast< jdouble >( ret );
 }
 
+
+static std::atomic_bool already_initialized(false);
+// static std::mutex sequence_mutex;
+
+JNIEXPORT jboolean JNICALL Java_com_huawei_graphblas_Native_enterSequence(
+	JNIEnv * env, jclass classDef ) {
+
+	/*
+	const unsigned max_num_threads = static_cast<unsigned>( maxNumThreads );
+	unsigned num_threads;
+	std::unique_lock< std::mutex > lk( counter_mutex );
+	num_threads = ++counter;
+	local_counter = num_threads;
+	if( num_threads > maxNumThreads ) {
+		return num_threads; // we have more elements than threads
+	}
+	pid_t tid = gettid();
+	std::string fn = "/home/ascolari/Projects/ALP-Spark/thread-" + std::to_string(tid) + ".log";
+	std::ofstream myfile(fn, std::ios_base::app);
+	myfile << "got threads: " << max_num_threads << std::endl;
+	myfile << "counter: " << num_threads << std::endl;
+	if( num_threads == max_num_threads ) {
+		lk.unlock();
+		cv.notify_all();
+	} else {
+		cv.wait( lk, [ max_num_threads] {
+			return counter.load() == max_num_threads;
+		} );
+	}
+	return static_cast< jint >( num_threads );
+	*/
+
+	bool f = false;
+	const bool initializer = already_initialized.compare_exchange_strong( f, true );
+	return static_cast< jboolean >( initializer );
+}
+
+JNIEXPORT void JNICALL Java_com_huawei_graphblas_Native_exitSequence(
+	JNIEnv * env, jclass classDef ) {
+	already_initialized.store(false);
+}

@@ -18,9 +18,11 @@
 
 import org.apache.spark.rdd.RDD
 
+
 import com.huawei.Utils
 import com.huawei.graphblas.Native
 import com.huawei.graphblas.PIDMapper
+import org.apache.spark.SparkContext
 
 package com.huawei {
 
@@ -247,7 +249,7 @@ package com.huawei {
 			}
 		};
 
-		type Instance = ( Int, org.apache.spark.broadcast.Broadcast[com.huawei.graphblas.PIDMapper], Array[(Int, Long)] )
+		type Instance = ( Array[String], org.apache.spark.broadcast.Broadcast[com.huawei.graphblas.PIDMapper], Array[(Int, Long)] )
 
 
 		//********************
@@ -307,6 +309,18 @@ package com.huawei {
 		//* GraphBLAS library functions *
 		//*******************************
 
+		def terminateSequence( sc: SparkContext, instance: Instance ) : Long = {
+			val terminated_count = sc.parallelize( instance._1 ).map {
+				node => {
+					val hostname: String = Utils.getHostnameUnique();
+					Native.exitSequence();
+					hostname
+				}
+			}.count
+			println( s"terminated $terminated_count nodes" )
+			terminated_count
+		}
+
 		/**
 		 * Initialises the GraphBLAS to be used.
 		 *
@@ -314,35 +328,44 @@ package com.huawei {
 		 */
 		def initialize( sc: org.apache.spark.SparkContext, P: Int ) : Instance = {
 
-			val hostnames = sc.parallelize( 0 until P ).map{ pid => {Utils.getHostname()} }.collect().toArray
-			println( "--->>> hostnames:")
-			val distinct_hostnames = hostnames.distinct
-			println( hostnames.distinct.toList )
+			// val hostnames = sc.parallelize( 0 until P ).map{ pid => {Utils.getHostname() } }.collect().toArray
+			println("keys")
+			val hosts = sc. statusTracker.getExecutorInfos.map( i => i.host )
+			println(hosts.toList)
 
-			val mapper = new PIDMapper( hostnames );
+			val hostnames = sc.parallelize( hosts ).map{ pid => {Utils.getHostnameUnique() } }.collect().toArray
+
+			println( "--->>> hostnames:")
+			println( hostnames.toList )
+			val unique_hostnames = hostnames.distinct
+			println( "--->>> distinct hostnames:")
+			println( unique_hostnames.toList )
+
+			val hostnames2 = sc.parallelize( hosts ).map{ pid => {Utils.getHostname() } }.collect().toArray
+			scala.util.Sorting.quickSort(hostnames2)
+
+			val mapper = new PIDMapper( unique_hostnames, hostnames2(0) );
 			val detectedP = mapper.numProcesses();
 			val master = mapper.headnode();
 			println( s"I detected $detectedP hosts." )
 			println( s"I elected $master as head node." )
 
 			val bcmap = sc.broadcast( mapper )
-			val rdd_out = sc.parallelize( 0 until P ).map {
-				pid => {
-					val hostname: String = Utils.getHostname();
+			val rdd_out = sc.parallelize( unique_hostnames ).map {
+				node => {
+					val hostname: String = Utils.getHostnameUnique();
 					val s: Int = bcmap.value.processID( hostname );
-					var ret: (Int,Long) = (s,0);
-					if( bcmap.value.threadID( hostname ) == 0 ) {
-						ret = (pid, Native.begin( bcmap.value.headnode(), s, bcmap.value.numProcesses() ))
-					}
-					ret
+					(s, Native.begin(master, s, mapper.numProcesses()));
 				}
-			}.filter( x => x._2 != 0 )
+			}
+			.filter( x => x._2 != 0 )
 			val results = rdd_out.collect().toArray
 			println("collected results:")
 			results.foreach( n => {
-				println("value: " + n)
+				println("host: " + n._1 + ", address: " + n._2)
 			})
-			val inst : Instance = (P, bcmap, results)
+			val inst : Instance = (unique_hostnames, bcmap, results)
+			terminateSequence( sc, inst )
 			inst
 		}
 
@@ -352,18 +375,19 @@ package com.huawei {
 		 * Individual #DenseVector and #SparseMatrix instances must be freed
 		 * manually.
 		 */
-		def exit( sc: org.apache.spark.SparkContext, instance: Instance ) : Unit = {
-			val rdd_out = sc.parallelize( 0 until instance._1 ).map {
-				pid => {
-					val hostname: String = Utils.getHostname();
+		def exit( sc: SparkContext, instance: Instance ) : Unit = {
+			val rdd_out = sc.parallelize( instance._1 ).map {
+				node => {
+					val hostname: String = Utils.getHostnameUnique();
 					val s: Int = instance._2.value.processID( hostname );
-					if( instance._2.value.threadID( hostname ) == 0 ) {
+					if( Native.enterSequence() ) {
 						val pointer_array: Array[(Int,Long)] = instance._3.filter( _._1 == s );
 						assert( pointer_array.size == 1 );
 						Native.end( pointer_array(0)._2 );
 					}
 				}
 			}
+			// terminateSequence( sc, instance )
 		}
 
 		/**
@@ -377,14 +401,14 @@ package com.huawei {
 		 *
 		 * @returns A handle to the distributed PageRank vector.
 		 */
-		def pagerank( sc: org.apache.spark.SparkContext, instance: Instance, filename: String ) : DenseVector = {
+		def pagerank( sc: SparkContext, instance: Instance, filename: String ) : DenseVector = {
 			val fn = sc.broadcast( filename );
-			val rdd_out = sc.parallelize( 0 until instance._1 ).map {
+			val rdd_out = sc.parallelize( instance._1 ).map {
 				pid => {
 					val hostname: String = Utils.getHostname();
 					val s: Int = instance._2.value.processID( hostname );
 					var ret: Long = 0;
-					if( instance._2.value.threadID( hostname ) == 0 ) {
+					if( Native.enterSequence() ) {
 						val pointer_array: Array[(Int,Long)] = instance._3.filter( _._1 == s );
 						assert( pointer_array.size == 1 );
 						ret = Native.execIO( pointer_array(0)._2, Native.PAGERANK_GRB_IO, fn.value );
@@ -392,6 +416,7 @@ package com.huawei {
 					(s, ret)
 				}
 			}
+			terminateSequence( sc, instance )
 			new DenseVector( rdd_out.collect() )
 		}
 
@@ -405,20 +430,21 @@ package com.huawei {
 		 * @returns A pair where the first element indicates an index and the second
 		 *          its value.
 		 */
-		def max( sc: org.apache.spark.SparkContext, instance: Instance, vector: DenseVector ) : (Long, Double) = {
-			val rdd_out = sc.parallelize( 0 until instance._1 ).map {
+		def max( sc: SparkContext, instance: Instance, vector: DenseVector ) : (Long, Double) = {
+			val rdd_out = sc.parallelize( instance._1 ).map {
 				pid => {
 					val hostname: String = Utils.getHostname();
 					val s: Int = instance._2.value.processID( hostname );
 					var index: Long = 0;
 					var value: Double = 0.0;
-					if( instance._2.value.threadID( hostname ) == 0 ) {
+					if( Native.enterSequence() ) {
 						index = Native.argmax( vector.data(s) );
 						value = Native.getValue( vector.data(s), index );
 					}
 					(index,value)
 				}
 			}
+			terminateSequence( sc, instance )
 			rdd_out.max()( new Ordering[Tuple2[Long,Double]]() {
 				override def compare( x: (Long,Double), y: (Long,Double)): Int =
 					Ordering[Double].compare(x._2, y._2)
@@ -432,16 +458,17 @@ package com.huawei {
 		 * @param[in] instance The GraphBLAS context.
 		 * @param[in] vector   The vector of which to find its maximum element.
 		 */
-		def destroy( sc: org.apache.spark.SparkContext, instance: Instance, vector: DenseVector ) : Unit = {
-			val rdd_out = sc.parallelize( 0 until instance._1 ).map {
+		def destroy( sc: SparkContext, instance: Instance, vector: DenseVector ) : Unit = {
+			val rdd_out = sc.parallelize( instance._1 ).map {
 				pid => {
 					val hostname: String = Utils.getHostname();
 					val s: Int = instance._2.value.processID( hostname );
-					if( instance._2.value.threadID( hostname ) == 0 ) {
+					if( Native.enterSequence() ) {
 						Native.destroyVector( vector.data(s) );
 					}
 				}
 			}
+			terminateSequence( sc, instance )
 		}
 
 		/**

@@ -17,9 +17,9 @@
 
 include config.conf
 
-.PHONY: all clean install
+.PHONY: all clean install jars cpp_clean
 
-all: build/libsparkgrb.so build/graphBLAS.jar examples/examples.jar
+all: build/libsparkgrb.so jars
 
 GRBCXX=$(GRB_INSTALL_PATH)/bin/grbcxx
 
@@ -27,7 +27,8 @@ CXX=$(GRBCXX) -b $(GRB_BACKEND)
 
 JNI_INCLUDE=$(patsubst %/bin/javac, %, $(realpath $(shell which $(JAVAC))))/include
 
-CPPFLAGS=-O3 -DNDEBUG -g -I $(JNI_INCLUDE) -I $(JNI_INCLUDE)/linux
+# CPPFLAGS=-O3 -DNDEBUG -g -I $(JNI_INCLUDE) -I $(JNI_INCLUDE)/linux
+CPPFLAGS=-O0 -g -I $(JNI_INCLUDE) -I $(JNI_INCLUDE)/linux
 
 LFLAGS=
 
@@ -35,37 +36,13 @@ ${GRB_INSTALL_PATH}/lib/spark/%: build/%
 	mkdir -p ${GRB_INSTALL_PATH}/lib/spark || true
 	cp "$<" "$@"
 
-install: ${GRB_INSTALL_PATH}/lib/spark/libsparkgrb.so ${GRB_INSTALL_PATH}/lib/spark/graphBLAS.jar
+jars:
+	sbt package
 
-build/graphBLAS.jar: build/com/huawei/Utils/package.class build/com/huawei/graphblas/Loader.class build/com/huawei/graphblas/Native.class build/com/huawei/GraphBLAS/package.class build/com/huawei/graphblas/PIDMapper.class
-	cd build; jar cf "../$@" com
 
-examples/examples.jar: examples/com/huawei/graphblas/examples/Initialise.class examples/com/huawei/graphblas/examples/SparkPagerank.class examples/com/huawei/graphblas/examples/Pagerank.class
-	cd examples; jar cf "../$@" com
-
-build/com_huawei_graphblas_Native.h: java/com/huawei/graphblas/Native.java java/com/huawei/graphblas/Loader.java
+build/com_huawei_graphblas_Native.h: graphBLAS/src/main/java/com/huawei/graphblas/Native.java graphBLAS/src/main/java/com/huawei/graphblas/Loader.java
 	mkdir build || true
 	$(JAVAC) -cp java -d ./build -h ./build "$<"
-
-build/com/huawei/graphblas/Loader.class: java/com/huawei/graphblas/Loader.java
-	mkdir build || true
-	$(JAVAC) -cp java -d ./build -h ./build "$<"
-
-build/com/huawei/graphblas/Native.class: java/com/huawei/graphblas/Native.java
-	mkdir build || true
-	$(JAVAC) -cp java -d ./build "$<"
-
-build/com/huawei/graphblas/PIDMapper.class: java/com/huawei/graphblas/PIDMapper.java
-	mkdir build || true
-	$(JAVAC) -cp java -d ./build "$<"
-
-build/com/huawei/Utils/package.class: scala/com/huawei/Utils.scala
-	mkdir build || true
-	$(SCALAC) -cp "build:${SPARK_HOME}/conf/:${SPARK_HOME}/jars/*" -d ./build "$<"
-
-build/com/huawei/GraphBLAS/package.class: scala/com/huawei/GraphBLAS.scala build/com/huawei/Utils/package.class build/com/huawei/graphblas/Loader.class build/com/huawei/graphblas/Native.class build/com/huawei/graphblas/PIDMapper.class
-	mkdir build || true
-	$(SCALAC) -cp "build:${SPARK_HOME}/conf/:${SPARK_HOME}/jars/*" -d ./build "$<"
 
 build/native.o: cpp/native.cpp build/com_huawei_graphblas_Native.h cpp/sparkgrb.hpp
 	${CXX} ${CPPFLAGS} -fPIC -Ibuild/ -I${GRB_INSTALL_PATH}/include/:./cpp/ -c -o "$@" "$<"
@@ -84,11 +61,9 @@ build/libsparkgrb.so: build/native.o build/pagerank.o
 	# The following is bugged:
 	#${CXX} -shared -o "${@}" ${^}
 
-examples/com/huawei/graphblas/examples/%.class: scala/com/huawei/graphblas/examples/%.scala build/graphBLAS.jar
-	mkdir examples || true
-	$(SCALAC) -cp "build:${SPARK_HOME}/conf/:${SPARK_HOME}/jars/*" -d ./examples "$<"
+cpp_clean:
+	@rm -rf build/libsparkgrb.so build/*.o || true &> /dev/null
 
-clean:
-	rm -r build
-	rm -r examples
-
+clean: cpp_clean
+	sbt clean
+	rm -rf build

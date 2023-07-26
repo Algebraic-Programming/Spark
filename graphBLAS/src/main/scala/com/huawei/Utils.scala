@@ -15,13 +15,19 @@
  */
 
 import sys.process._
+import org.apache.spark.SparkEnv
 
 package com.huawei {
 
 	package object Utils {
 
+
 		final def getHostname() : String = {
 			"hostname -f".!!.stripLineEnd
+		}
+
+		final def getHostnameUnique() : String = {
+			getHostname + "-" + SparkEnv.get.executorId
 		}
 
 	}

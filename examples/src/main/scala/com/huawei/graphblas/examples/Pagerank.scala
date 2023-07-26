@@ -48,9 +48,9 @@ object Pagerank {
 		val P = args(0).toInt;
 		println( s"Using P = $P." );
 		val t0 = System.nanoTime();
-		val hostnames = sc.parallelize( 0 until P ).map{ pid => {(SparkEnv.get.executorId, Utils.getHostname())} }.collect().toArray
-		println("Manual hostnames gathering at start of example:")
-		println(hostnames.map(t => t._2).flatten)
+		// val hostnames = sc.parallelize( 0 until P ).map{ pid => {(SparkEnv.get.executorId, Utils.getHostname())} }.collect().toArray
+		// println("Manual hostnames gathering at start of example:")
+		// println(hostnames.map(t => t._2).flatten)
 
 		println("Now creating GraphBLAS launcher:")
 		val grb = com.huawei.GraphBLAS.initialize( sc, P )

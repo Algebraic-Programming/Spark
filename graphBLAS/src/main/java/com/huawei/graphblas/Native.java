@@ -17,12 +17,18 @@
 
 
 package com.huawei.graphblas;
+import java.net.Socket;
+import java.io.FileWriter;
 
 import java.io.Serializable;
-
+import java.time.LocalDateTime;
 
 /** Collects the native interface into the GraphBLAS. */
 public class Native implements Serializable {
+
+	static {
+		System.loadLibrary( "sparkgrb" );
+	}
 
 	/** Version data used for serialisation. */
 	private static final long serialVersionUID = 1L;
@@ -44,9 +50,39 @@ public class Native implements Serializable {
 	 *
 	 * @returns An instance pointer used to start GraphBLAS programs.
 	 */
-	public static long begin( String master, int s, int P ) {
+	public static long begin( String master, int s, int P ) throws Exception {
+		/*
+		FileWriter myWriter = new FileWriter("/home/ascolari/Projects/ALP-Spark/native-" + s + ".log");
+		myWriter.write("P is: " + P);
+		myWriter.write("\n");
+		if(s >= P) {
+			 	throw new Exception( "--->>> WTFFFFFFFFFF" );
+		}
+		LocalDateTime t = java.time.LocalDateTime.now();
+		myWriter.write("init time is : ");
+		myWriter.write(t.toString());
+		myWriter.write("\n");
+		myWriter.close();
+		if (s>0) {
+			try {
+				Thread.sleep(30000);
+				Socket socket = new Socket(master, 7177);
+				socket.close();
+			} catch( Exception e ) {
+			 	throw new Exception( "--->>> GOT EXCEPTION " + e.toString() + " while connecting to " + master + " at port 7177 at time " + java.time.LocalDateTime.now() + ", call time: " + t );
+			}
+		}
 		System.loadLibrary( "sparkgrb" );
-		return start( master, s, P );
+		long ready = start( master, s, P );
+		// if( s == 0) {
+		// 	throw new Exception("called here at: " + t);
+		// }
+		return ready;
+		*/
+		boolean isMain = Native.enterSequence();
+		// long inst = isMain ? 1L : 0L;
+		long inst = isMain ? Native.start( master, s, P ) : 0L;
+		return inst;
 	}
 
 	/** @see #begin -- this implements the native part of its functionality. */
@@ -179,5 +215,9 @@ public class Native implements Serializable {
 	 */
 	public static native double getValue( long vector, long index );
 
+
+	public static native boolean enterSequence();
+
+	public static native void exitSequence();
 };
 

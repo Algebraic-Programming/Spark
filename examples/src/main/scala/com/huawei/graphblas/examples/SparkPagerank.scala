@@ -274,7 +274,7 @@ object SparkPagerank {
 		sc.setCheckpointDir( chkptdir );
 
 		val hostnames = sc.parallelize( 0 until P ).map{ pid => {Utils.getHostname()} }.collect().toArray
-		val mapper = new com.huawei.graphblas.PIDMapper( sc.parallelize( 0 until P ).map{ pid => {Utils.getHostname()} }.collect().toArray )
+		val mapper = new com.huawei.graphblas.PIDMapper( sc.parallelize( 0 until P ).map{ pid => {Utils.getHostname()} }.collect().toArray, null ) // change me!!!!!!!!!
 		val nodes = mapper.numProcesses()
 		println( s"I detected $nodes individual worker nodes." );
 

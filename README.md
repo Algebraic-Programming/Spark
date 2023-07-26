@@ -107,7 +107,7 @@ You should first clone this repository on this branch and enter the folder, if
 you haven't done so yet:
 
 ```bash
-git clone -b https://github.com/Algebraic-Programming/Spark.git
+git clone -b latest_scala https://github.com/Algebraic-Programming/Spark.git
 cd Spark
 ALP_SPARK_PATH=$(pwd)
 ```
@@ -139,7 +139,7 @@ for example:
 
 ```bash
 ${SPARK_HOME}/sbin/start-master.sh
-${SPARK_HOME}/sbin/start-worker.sh http://$(hostname):7077
+${SPARK_HOME}/sbin/start-worker.sh spark://$(hostname):7077
 ```
 
 Then you can submit ALP/Spark jobs to this master as normal Spark jobs, with

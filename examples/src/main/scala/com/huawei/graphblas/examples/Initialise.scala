@@ -43,14 +43,19 @@ object Initialise {
 			println( "Example requires number of parameters is passed as its first and only argument." );
 			return;
 		}
-		val sc = new SparkContext( new SparkConf().setAppName( "Example" ) );
+		val env = Map("JAVA_HOME" -> "/home/ascolari/Projects/ALP-Spark/lpf_java_launcher")
+		val sc = new SparkContext("spark://ascolari.lan.huaweirc.ch:7077", "Example", null, Nil, env );
 
 		val P = args(0).toInt;
 		println( s"Using P = $P." );
 		val t0 = System.nanoTime();
-		val hostnames = sc.parallelize( 0 until P ).map{ pid => {(SparkEnv.get.executorId, Utils.getHostname())} }.collect().toArray
+		val hostnames = sc.parallelize( 0 until P ).map{ pid => {(SparkEnv.get.executorId, Utils.getHostnameUnique())} }.collect().toArray
 		println("Manual hostnames gathering at start of example:")
 		println(hostnames.map(t => t._2).flatten)
+		hostnames.foreach( c => {
+				println("--> exec ID " + c._1 + ", hostname " + c._2 )
+			}
+		)
 
 		println("Now creating GraphBLAS launcher:")
 		val grb = com.huawei.GraphBLAS.initialize( sc, P )
