@@ -182,5 +182,9 @@ public class Native implements Serializable {
 	 */
 	public static native double getValue( long vector, long index );
 
+	public static native long get_measured_time_ns();
+
+	public static native int get_num_tests();
+
 };
 

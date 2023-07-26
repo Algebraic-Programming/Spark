@@ -23,6 +23,18 @@
 #include <string>
 
 #include <stdlib.h>
+#include <chrono>
+
+static std::chrono::nanoseconds measured_time;
+static constexpr unsigned num_tests = 3;
+
+std::chrono::nanoseconds::rep _get_measured_time_ns() {
+	return measured_time.count();
+}
+
+unsigned _get_num_tests() {
+	return num_tests;
+}
 
 /**
  * Starts the GraphBLAS pagerank algorithm in #grb::algorithms by reading an
@@ -96,6 +108,25 @@ void grb_pagerank( const GrB_Input &data_in, GrB_Output &out ) {
 			0.85, .00000001, 100,
 			&( out.iterations ), &( out.residual )
 		);
+
+		for( unsigned i = 0; i < num_tests; i++) {
+			const auto start = std::chrono::high_resolution_clock::now();
+			out.error_code = grb::algorithms::simple_pagerank< grb::descriptors::no_operation >(
+				pr, L,
+				workspace1, workspace2, workspace3,
+				0.85, .00000001, 100,
+				&( out.iterations ), &( out.residual )
+			);
+			const auto end = std::chrono::high_resolution_clock::now();
+			measured_time += (end - start);
+			if( out.error_code != grb::SUCCESS ) {
+				std::string error_code = grb::toString( out.error_code );
+#ifdef FILE_LOGGING
+				(void) fprintf( file, "Call to PageRank failed with error code %s; ", error_code.c_str() );
+#endif
+				return;
+			}
+		}
 		if( out.error_code != grb::SUCCESS ) {
 			std::string error_code = grb::toString( out.error_code );
 #ifdef FILE_LOGGING

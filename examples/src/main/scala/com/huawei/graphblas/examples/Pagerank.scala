@@ -53,26 +53,28 @@ object Pagerank {
 		println(hostnames.map(t => t._2).flatten)
 
 		println("Now creating GraphBLAS launcher:")
-		val grb = com.huawei.GraphBLAS.initialize( sc, P )
+		val grb = GraphBLAS.initialize( sc, P )
 		println("grb instance contents:")
 		println(grb)
 		val t1 = System.nanoTime();
-		val output = com.huawei.GraphBLAS.pagerank( sc, grb, args(1) );
+		val output = GraphBLAS.pagerank( sc, grb, args(1) );
 		val t2 = System.nanoTime();
 		println("output contents:")
 		println(output)
 		val t3 = System.nanoTime();
-		val maxpair = com.huawei.GraphBLAS.max( sc, grb, output );
+		val maxpair = GraphBLAS.max( sc, grb, output );
 		val t4 = System.nanoTime();
 		println("maximum PageRank entry:");
 		println(maxpair);
-		com.huawei.GraphBLAS.destroy( sc, grb, output );
-		com.huawei.GraphBLAS.exit( sc, grb )
+		GraphBLAS.destroy( sc, grb, output );
+		GraphBLAS.exit( sc, grb )
 		println("GraphBLAS cleaned up.")
 		val time_taken = (System.nanoTime() - t0) / 1000000000.0;
 		val t21 = (t2 - t1) / 1000000000.0;
 		val t43 = (t4 - t3) / 1000000000.0;
-		println( s"Accelerated PageRank call: $t21 seconds." );
+		val (time_ns, num_tests) = GraphBLAS.get_measured_time_ns(sc, grb);
+		val accell_time = (time_ns.toDouble / 1000000000.0) / num_tests;
+		println( s"Accelerated PageRank call: $accell_time seconds." );
 		println( s"Max extraction call: $t43 seconds." );
 		println( s"End-to-end time taken: $time_taken seconds." );
 	}

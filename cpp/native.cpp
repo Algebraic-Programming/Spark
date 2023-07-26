@@ -25,6 +25,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <chrono>
 
 /** LPF is not responsible for process management. */
 const int LPF_MPI_AUTO_INITIALIZE = 0;
@@ -354,3 +355,14 @@ JNIEXPORT jdouble JNICALL Java_com_huawei_graphblas_Native_getValue( JNIEnv * en
 	return static_cast< jdouble >( ret );
 }
 
+extern std::chrono::nanoseconds::rep _get_measured_time_ns();
+
+extern unsigned _get_num_tests();
+
+JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_get_1measured_1time_1ns(JNIEnv *, jclass) {
+	return static_cast< jlong > ( _get_measured_time_ns() );
+}
+
+JNIEXPORT jint JNICALL Java_com_huawei_graphblas_Native_get_1num_1tests(JNIEnv *, jclass) {
+	return static_cast< jint >( _get_num_tests() );
+}

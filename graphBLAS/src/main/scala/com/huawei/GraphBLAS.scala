@@ -22,6 +22,8 @@ import com.huawei.Utils
 import com.huawei.graphblas.Native
 import com.huawei.graphblas.PIDMapper
 
+import org.apache.spark.SparkContext
+
 package com.huawei {
 
 	package object GraphBLAS {
@@ -442,6 +444,21 @@ package com.huawei {
 					}
 				}
 			}
+		}
+
+		def get_measured_time_ns( sc: SparkContext, instance: Instance ) : (Long, Int) = {
+			val rdd = sc.parallelize( 0 until instance._1 ).map( {
+				pid => {
+					val hostname: String = Utils.getHostname();
+					val s: Int = instance._2.value.processID( hostname );
+					if( instance._2.value.threadID( hostname ) == 0 )
+						(s, Native.get_measured_time_ns, Native.get_num_tests)
+					else
+						(-1, -1L, -1)
+				}
+			} ).filter( x => x._1 == 0 )
+			val triple = rdd.collect()(0)
+			return (triple._2, triple._3)
 		}
 
 		/**
