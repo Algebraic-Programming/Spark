@@ -230,7 +230,7 @@ object SparkPagerank {
 		val read_time_taken = (System.nanoTime() - time) / 1000000000.0;
 		println( s"Time taken for matrix load: $read_time_taken" );
 
-		val times: Array[Double] = new Array[Double]( 30 );
+		val times: Array[Double] = new Array[Double]( 5 );
 
 		println( "Starting dry run using default parameters..." );
 		val dry_t0 = System.nanoTime();
@@ -249,8 +249,12 @@ object SparkPagerank {
 			println( s" Experiment $i: $time_taken seconds. Checksum: $checksum" );
 		}
 		val avg_time: Double = times.sum / times.size;
-		val sstddev:  Double = sqrt( times.map( x => (x - avg_time) * (x - avg_time) ).sum / (times.size-1) )
-		println( s"Average time taken: $avg_time seconds.\nSample standard deviation: $sstddev" );
+		if (times.size > 1)
+			val sstddev:  Double = sqrt( times.map( x => (x - avg_time) * (x - avg_time) ).sum / (times.size-1) )
+			println( s"Average time taken: $avg_time seconds.\nSample standard deviation: $sstddev" );
+		else
+			val t = times(0)
+			println( s"Time taken for experiment: $t seconds." );
 	}
 
 	def main( args: Array[String] ): Unit = {
