@@ -43,7 +43,13 @@ object Pagerank {
 			println( "Usage: ./program_name <P> <matrix file>." );
 			return;
 		}
-		val sc = new SparkContext( new SparkConf().setAppName( "Spark GraphBLAS Pagerank" ) );
+		val conf = new SparkConf().setAppName( "Spark GraphBLAS Pagerank" )
+			.setMaster("spark://ascolari.lan.huaweirc.ch:7077")
+			.setExecutorEnv( "LPF_INIT", "NO")
+			.setExecutorEnv( "JAVA_HOME", "/home/ascolari/Projects/ALP-Spark/lpf_java_launcher" )
+		val sc = new SparkContext( conf );
+		println( "--> default parallelism: " + sc. defaultParallelism )
+
 
 		val P = args(0).toInt;
 		println( s"Using P = $P." );
@@ -53,21 +59,26 @@ object Pagerank {
 		// println(hostnames.map(t => t._2).flatten)
 
 		println("Now creating GraphBLAS launcher:")
-		val grb = com.huawei.GraphBLAS.initialize( sc, P )
-		println("grb instance contents:")
-		println(grb)
+		val grb = new GraphBLAS( sc, P )
+		println("====================================")
+		println("  Now running GraphBLAS PageRank")
+		println("====================================")
+
 		val t1 = System.nanoTime();
-		val output = com.huawei.GraphBLAS.pagerank( sc, grb, args(1) );
+		val output = grb.pagerank( args(1) );
+		println("====================================")
+		println("    GraphBLAS PageRank completed")
+		println("====================================")
 		val t2 = System.nanoTime();
 		println("output contents:")
 		println(output)
 		val t3 = System.nanoTime();
-		val maxpair = com.huawei.GraphBLAS.max( sc, grb, output );
+		val maxpair = grb.max( output );
 		val t4 = System.nanoTime();
 		println("maximum PageRank entry:");
 		println(maxpair);
-		com.huawei.GraphBLAS.destroy( sc, grb, output );
-		com.huawei.GraphBLAS.exit( sc, grb )
+		grb.destroy( output );
+		grb.exit()
 		println("GraphBLAS cleaned up.")
 		val time_taken = (System.nanoTime() - t0) / 1000000000.0;
 		val t21 = (t2 - t1) / 1000000000.0;

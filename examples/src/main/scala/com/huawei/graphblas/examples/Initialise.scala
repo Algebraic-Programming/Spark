@@ -58,10 +58,10 @@ object Initialise {
 		)
 
 		println("Now creating GraphBLAS launcher:")
-		val grb = com.huawei.GraphBLAS.initialize( sc, P )
+		val grb = new GraphBLAS( sc, P )
 		println("grb instance contents:")
 		println(grb)
-		com.huawei.GraphBLAS.exit( sc, grb )
+		grb.exit
 		println("GraphBLAS cleaned up.")
 		val time_taken = (System.nanoTime() - t0) / 1000000000.0;
 		println( s"Accelerator time taken: $time_taken." );

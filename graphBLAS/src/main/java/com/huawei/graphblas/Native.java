@@ -22,6 +22,9 @@ import java.io.FileWriter;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
+import java.net.ServerSocket;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 
 /** Collects the native interface into the GraphBLAS. */
 public class Native implements Serializable {
@@ -51,38 +54,58 @@ public class Native implements Serializable {
 	 * @returns An instance pointer used to start GraphBLAS programs.
 	 */
 	public static long begin( String master, int s, int P ) throws Exception {
-		/*
-		FileWriter myWriter = new FileWriter("/home/ascolari/Projects/ALP-Spark/native-" + s + ".log");
-		myWriter.write("P is: " + P);
-		myWriter.write("\n");
-		if(s >= P) {
-			 	throw new Exception( "--->>> WTFFFFFFFFFF" );
-		}
-		LocalDateTime t = java.time.LocalDateTime.now();
-		myWriter.write("init time is : ");
-		myWriter.write(t.toString());
-		myWriter.write("\n");
-		myWriter.close();
-		if (s>0) {
-			try {
-				Thread.sleep(30000);
-				Socket socket = new Socket(master, 7177);
-				socket.close();
-			} catch( Exception e ) {
-			 	throw new Exception( "--->>> GOT EXCEPTION " + e.toString() + " while connecting to " + master + " at port 7177 at time " + java.time.LocalDateTime.now() + ", call time: " + t );
-			}
-		}
-		System.loadLibrary( "sparkgrb" );
-		long ready = start( master, s, P );
+		// FileWriter myWriter = new FileWriter("/home/ascolari/Projects/ALP-Spark/native-" + s + ".log");
+		// myWriter.write("P is: " + P);
+		// myWriter.write("\n");
+		// if(s >= P) {
+		// 	 	throw new Exception( "--->>> WTFFFFFFFFFF" );
+		// }
+		// LocalDateTime t = java.time.LocalDateTime.now();
+		// myWriter.write("init time is : ");
+		// myWriter.write(t.toString());
+		// myWriter.write("\n");
+		// myWriter.close();
+		// if (s>0) {
+		// 	try {
+		// 		Thread.sleep(30000);
+		// 		Socket socket = new Socket(master, 7177);
+		// 		socket.close();
+		// 	} catch( Exception e ) {
+		// 	 	throw new Exception( "--->>> GOT EXCEPTION " + e.toString() + " while connecting to " + master + " at port 7177 at time " + java.time.LocalDateTime.now() + ", call time: " + t );
+		// 	}
+		// }
+		// long ready = start( master, s, P );
 		// if( s == 0) {
 		// 	throw new Exception("called here at: " + t);
 		// }
-		return ready;
-		*/
+		// return ready;
 		boolean isMain = Native.enterSequence();
-		// long inst = isMain ? 1L : 0L;
-		long inst = isMain ? Native.start( master, s, P ) : 0L;
-		return inst;
+		return isMain ? Native.start( master, s, P ) : 0L;
+		// if(isMain) {
+		// 	if( s == 0 ){
+		// 		FileWriter myWriter = new FileWriter("/home/ascolari/Projects/ALP-Spark/server-" + s + ".log");
+		// 		ServerSocket server = new ServerSocket(7894);
+		// 		server.setSoTimeout(120000);
+		// 		LocalDateTime t = java.time.LocalDateTime.now();
+		// 		myWriter.write("time is " + t.toString() + "\n");
+		// 		myWriter.close();
+		// 		Socket socket = server.accept();
+		// 		ObjectInputStream ois = new ObjectInputStream(socket.getInputStream());
+		// 		//convert ObjectInputStream object to String
+		// 		String message = (String) ois.readObject();
+		// 		server.close();
+		// 		throw new Exception( "got message: " + message );
+		// 	} else {
+		// 		Thread.sleep(10000);
+		// 		Socket socket = new Socket("localhost", 7894);
+		// 		ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
+		// 		oos.writeObject("exit");
+		// 		LocalDateTime t = java.time.LocalDateTime.now();
+		// 		socket.close();
+		// 		throw new Exception( "sent to server at " + t );
+		// 	}
+		// }
+		// return 0L;
 	}
 
 	/** @see #begin -- this implements the native part of its functionality. */
