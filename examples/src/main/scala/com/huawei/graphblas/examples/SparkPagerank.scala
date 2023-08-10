@@ -225,32 +225,34 @@ object SparkPagerank {
 
 	def benchmark( sc: SparkContext, file: String, P: Int ): Unit = {
 
-		var time = System.nanoTime();
-		val matrix: Matrix = new Matrix( sc, file, P, true );
-		val read_time_taken = (System.nanoTime() - time) / 1000000000.0;
-		println( s"Time taken for matrix load: $read_time_taken" );
+		var time = System.nanoTime()
+		val matrix: Matrix = new Matrix( sc, file, P, true )
+		val read_time_taken = (System.nanoTime() - time) / 1000000000.0
+		println( s"Time taken for matrix load: $read_time_taken" )
 
-		val times: Array[Double] = new Array[Double]( 30 );
+		val times: Array[Double] = new Array[Double]( 30 )
 
-		println( "Starting dry run using default parameters..." );
-		val dry_t0 = System.nanoTime();
-		flops( sc, matrix, 0.85, 100, 0.0000000001, 30, 4 ).unpersist();
-		val dry_t1 = (System.nanoTime() - dry_t0) / 1000000000.0;
-		println( s"Time taken for dry run: $dry_t1 seconds." );
+		println( "Starting dry run using default parameters..." )
+		val dry_t0 = System.nanoTime()
+		val maxIters: Int = 80
+		val tolerance: Double = 0.0000001
+		flops( sc, matrix, 0.85, maxIters, tolerance, 30, 4 ).unpersist()
+		val dry_t1 = (System.nanoTime() - dry_t0) / 1000000000.0
+		println( s"Time taken for dry run: $dry_t1 seconds." )
 
-		println( "Performing benchmark of the flop-variant:" );
+		println( "Performing benchmark of the flop-variant:" )
 		for( i <- 1 to times.size ) {
-			val time: Long = System.nanoTime();
-			val ranks = flops( sc, matrix, 0.85, 100, 0.0000001 );
-			val checksum = ranks.count();
-			ranks.unpersist();
-			val time_taken: Double = (System.nanoTime() - time) / 1000000000.0;
-			times(i-1) = time_taken;
-			println( s" Experiment $i: $time_taken seconds. Checksum: $checksum" );
+			val time: Long = System.nanoTime()
+			val ranks = flops( sc, matrix, 0.85, maxIters, tolerance )
+			val checksum = ranks.count()
+			ranks.unpersist()
+			val time_taken: Double = (System.nanoTime() - time) / 1000000000.0
+			times(i-1) = time_taken
+			println( s" Experiment $i: $time_taken seconds. Checksum: $checksum" )
 		}
-		val avg_time: Double = times.sum / times.size;
+		val avg_time: Double = times.sum / times.size
 		val sstddev:  Double = sqrt( times.map( x => (x - avg_time) * (x - avg_time) ).sum / (times.size-1) )
-		println( s"Average time taken: $avg_time seconds.\nSample standard deviation: $sstddev" );
+		println( s"Number of runs: ${times.size}.\nAverage time taken: $avg_time seconds.\nSample standard deviation: $sstddev" )
 	}
 
 	def main( args: Array[String] ): Unit = {

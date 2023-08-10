@@ -29,9 +29,12 @@
 #include <atomic>
 #include <mutex>
 #include <condition_variable>
+#include <stdexcept>
 
 #include <sys/types.h>
 #include <fstream>
+
+static Persistent * grb_instance = nullptr;
 
 /** LPF is not responsible for process management. */
 // const int LPF_MPI_AUTO_INITIALIZE = 0;
@@ -46,7 +49,11 @@ JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_execIO( JNIEnv * env, j
 	fp += "/graphblastest.txt";
 	FILE * file = fopen( fp.c_str(), "a" );
 #endif
-	Persistent * const launcher_p = reinterpret_cast< Persistent * >( instance );
+	// Persistent * const launcher_p = reinterpret_cast< Persistent * >( instance );
+	if( grb_instance == nullptr ) {
+		throw std::runtime_error( "instance not valid" );
+	}
+	Persistent * const launcher_p = grb_instance;
 #ifdef FILE_LOGGING
 	(void)fprintf( file,
 		"I am process %d and I have been asked to perform a graphBLAS program with "
@@ -132,7 +139,8 @@ JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_start( JNIEnv * env, jc
 	// return 0;
 	// sleep( 60 );
 	myfile << "connecting to " << hostname_str << std::endl;
-	Persistent * const ret = new Persistent( pid, P, hostname_str, "7177", true );
+	Persistent * const ret = new Persistent( pid, P, hostname_str, "7177", false );
+	grb_instance = ret;
 	myfile << "connected to " << hostname_str << std::endl;
 	int world_size, flag;
 	MPI_Comm_size(MPI_COMM_WORLD, &world_size);
@@ -154,7 +162,10 @@ JNIEXPORT void JNICALL Java_com_huawei_graphblas_Native_end( JNIEnv * env, jclas
 #ifdef FILE_LOGGING
 	FILE * file = fopen( "/tmp/graphblastest.txt", "a" );
 #endif
-	Persistent * const launcher_p = reinterpret_cast< Persistent * >( data );
+	if( grb_instance == nullptr ) {
+		throw std::runtime_error( "instance not valid" );
+	}
+	Persistent * const launcher_p = grb_instance;
 #ifdef FILE_LOGGING
 	(void)fprintf( file, "I am process %d. I am about to delete the launcher at %p... ", getpid(), launcher_p );
 	(void)fflush( file );
@@ -279,6 +290,8 @@ JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_argmax( JNIEnv * env, j
 	(void)fflush( file );
 #endif
 	const size_t nnz = pointer->nonzeroes();
+	// sleep(120);
+
 	if( nnz == 0 ) {
 		return static_cast< jlong >( -1 );
 	}
@@ -290,7 +303,8 @@ JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_argmax( JNIEnv * env, j
 		double curmax = pointer->getNonzeroValue( curmaxi );
 		for( size_t i = 1; i < nnz; ++i ) {
 			const size_t index = pointer->getNonzeroIndex( i );
-			const double curval = pointer->getNonzeroValue( index );
+			// const double curval = pointer->getNonzeroValue( index );
+			const double curval = pointer->getNonzeroValue( i );
 			if( curval > curmax ) {
 				curmaxi = index;
 			}
@@ -376,4 +390,16 @@ JNIEXPORT jboolean JNICALL Java_com_huawei_graphblas_Native_enterSequence(
 JNIEXPORT void JNICALL Java_com_huawei_graphblas_Native_exitSequence(
 	JNIEnv * env, jclass classDef ) {
 	already_initialized.store(false);
+}
+
+extern unsigned get_pr_iterations();
+
+extern unsigned long get_pr_time();
+
+JNIEXPORT jint JNICALL Java_com_huawei_graphblas_Native_get_1iterations(JNIEnv *, jclass) {
+	return static_cast< jint >( get_pr_iterations() );
+}
+
+JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_get_1time(JNIEnv *, jclass) {
+	return static_cast< jlong >( get_pr_time() );
 }

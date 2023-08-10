@@ -242,5 +242,9 @@ public class Native implements Serializable {
 	public static native boolean enterSequence();
 
 	public static native void exitSequence();
+
+	public static native int get_iterations();
+
+	public static native long get_time();
 };
 

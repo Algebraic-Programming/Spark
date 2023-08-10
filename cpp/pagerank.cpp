@@ -15,14 +15,29 @@
  * limitations under the License.
  */
 
+#include <string>
+#include <stdlib.h>
+#include <chrono>
+
 #include "graphblas/algorithms/simple_pagerank.hpp"
 #include "graphblas/utils/parser/MatrixFileReader.hpp"
 
 #include "sparkgrb.hpp"
 
-#include <string>
 
-#include <stdlib.h>
+constexpr unsigned iters = 5;
+using duration_t = std::chrono::time_point<std::chrono::high_resolution_clock>::duration;
+static duration_t pr_time = duration_t::zero();
+
+unsigned get_pr_iterations() {
+	return iters;
+}
+
+unsigned long get_pr_time() {
+	return static_cast< unsigned long >(
+		std::chrono::duration_cast<std::chrono::nanoseconds>( pr_time ).count()
+	);
+}
 
 /**
  * Starts the GraphBLAS pagerank algorithm in #grb::algorithms by reading an
@@ -90,12 +105,28 @@ void grb_pagerank( const GrB_Input &data_in, GrB_Output &out ) {
 		(void) fprintf( file, "Output vector allocated, now passing to PageRank function\n" );
 		(void) fflush( file );
 #endif
+		constexpr double tolerance = 0.0000001;
+		constexpr unsigned maxIters = 80;
 		out.error_code = grb::algorithms::simple_pagerank< grb::descriptors::no_operation >(
 			pr, L,
 			workspace1, workspace2, workspace3,
-			0.85, .00000001, 1000,
+			0.85, tolerance, maxIters,
 			&( out.iterations ), &( out.residual )
 		);
+		pr_time = duration_t::zero();
+		for( unsigned i = 0; i < iters; i++ ) {
+			grb::clear( pr );
+			auto start = std::chrono::high_resolution_clock::now();
+			out.error_code = grb::algorithms::simple_pagerank< grb::descriptors::no_operation >(
+				pr, L,
+				workspace1, workspace2, workspace3,
+				0.85, tolerance, maxIters,
+				&( out.iterations ), &( out.residual )
+			);
+			auto end = std::chrono::high_resolution_clock::now();
+			pr_time += ( end - start );
+		}
+
 		if( out.error_code != grb::SUCCESS ) {
 			std::string error_code = grb::toString( out.error_code );
 #ifdef FILE_LOGGING
@@ -106,6 +137,10 @@ void grb_pagerank( const GrB_Input &data_in, GrB_Output &out ) {
 #ifdef FILE_LOGGING
 		(void) fprintf( file, "Call to PageRank successful; " );
 #endif
+		// std::string fn = "/home/ascolari/Projects/ALP-Spark/pr-" + std::to_string(getpid()) + ".log";
+		// std::ofstream myfile(fn);
+		// myfile << "ciao" << std::endl;
+		// myfile << "nonzero " << nnz(pr) << std::endl;
 		out.pinnedVector = new grb::PinnedVector< double >( pr, grb::PARALLEL );
 #ifdef FILE_LOGGING
 		(void) fprintf( file, "iters = %zd, residual = %.10e\n", out.iterations, out.residual );

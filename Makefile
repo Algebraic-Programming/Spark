@@ -19,7 +19,7 @@ include config.conf
 
 .PHONY: all clean install jars cpp_clean
 
-all: build/libsparkgrb.so jars
+all: cpp_lib jars
 
 GRBCXX=$(GRB_INSTALL_PATH)/bin/grbcxx
 
@@ -60,6 +60,8 @@ build/libsparkgrb.so: build/native.o build/pagerank.o
 	${PREFIX} -shared -o "${@}" ${^} ${MPOSTFIX}
 	# The following is bugged:
 	#${CXX} -shared -o "${@}" ${^}
+
+cpp_lib: build/libsparkgrb.so
 
 cpp_clean:
 	@rm -rf build/libsparkgrb.so build/*.o || true &> /dev/null
