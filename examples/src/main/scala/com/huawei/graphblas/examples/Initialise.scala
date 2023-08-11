@@ -21,6 +21,7 @@ package com.huawei.graphblas.examples
 import org.apache.spark.SparkEnv
 import org.apache.spark.SparkConf
 import org.apache.spark.SparkContext
+import scala.util.Using
 
 import com.huawei.Utils
 import com.huawei.GraphBLAS
@@ -59,12 +60,13 @@ object Initialise {
 
 		println("Now creating GraphBLAS launcher:")
 		val grb = new GraphBLAS( sc, P )
-		println("grb instance contents:")
-		println(grb)
-		grb.exit
-		println("GraphBLAS cleaned up.")
-		val time_taken = (System.nanoTime() - t0) / 1000000000.0;
-		println( s"Accelerator time taken: $time_taken." );
+		Using( new GraphBLAS( sc, P ) ) { grb => {
+			println("grb instance contents:")
+			println(grb)
+			// println("GraphBLAS cleaned up.")
+			val time_taken = (System.nanoTime() - t0) / 1000000000.0;
+			println( s"Accelerator time taken: $time_taken." );
+		}}
 	}
 }
 

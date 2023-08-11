@@ -27,7 +27,7 @@ package com.huawei {
 		}
 
 		final def getHostnameUnique() : String = {
-			getHostname + "-" + SparkEnv.get.executorId
+			getHostname() + "-" + SparkEnv.get.executorId
 		}
 
 	}

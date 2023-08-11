@@ -131,22 +131,20 @@ JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_start( JNIEnv * env, jc
 #endif
 	std::string hostname_str = hostname_c;
 	env->ReleaseStringUTFChars( hostname, hostname_c );
-	std::string fn = "/home/ascolari/Projects/ALP-Spark/app-" + std::to_string(pid) + ".log";
-	std::ofstream myfile(fn);
-	myfile << "hostname is " << hostname_str << std::endl;
-	myfile << "PID is " << getpid() << std::endl;
-	myfile << "ID is " << pid << " out of " << P << std::endl;
-	// return 0;
-	// sleep( 60 );
-	myfile << "connecting to " << hostname_str << std::endl;
+	// std::string fn = "/home/ascolari/Projects/ALP-Spark/app-" + std::to_string(pid) + ".log";
+	// std::ofstream myfile(fn);
+	// myfile << "hostname is " << hostname_str << std::endl;
+	// myfile << "PID is " << getpid() << std::endl;
+	// myfile << "ID is " << pid << " out of " << P << std::endl;
+	// myfile << "connecting to " << hostname_str << std::endl;
 	Persistent * const ret = new Persistent( pid, P, hostname_str, "7177", false );
 	grb_instance = ret;
-	myfile << "connected to " << hostname_str << std::endl;
+	// myfile << "connected to " << hostname_str << std::endl;
 	int world_size, flag;
 	MPI_Comm_size(MPI_COMM_WORLD, &world_size);
-	myfile << "seeing " << world_size << std::endl;
+	// myfile << "seeing " << world_size << std::endl;
 	MPI_Initialized( &flag );
-	myfile << "MPI is inited: " << ( flag ? "TRUE" : "FALSE" ) << std::endl;
+	// myfile << "MPI is inited: " << ( flag ? "TRUE" : "FALSE" ) << std::endl;
 	assert( ret != NULL );
 #ifdef FILE_LOGGING
 	// do some logging
@@ -396,10 +394,10 @@ extern unsigned get_pr_iterations();
 
 extern unsigned long get_pr_time();
 
-JNIEXPORT jint JNICALL Java_com_huawei_graphblas_Native_get_1iterations(JNIEnv *, jclass) {
+JNIEXPORT jint JNICALL Java_com_huawei_graphblas_Native_getIterations(JNIEnv *, jclass) {
 	return static_cast< jint >( get_pr_iterations() );
 }
 
-JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_get_1time(JNIEnv *, jclass) {
+JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_getTime(JNIEnv *, jclass) {
 	return static_cast< jlong >( get_pr_time() );
 }

@@ -21,6 +21,7 @@ package com.huawei.graphblas.examples
 import org.apache.spark.SparkEnv
 import org.apache.spark.SparkConf
 import org.apache.spark.SparkContext
+import scala.util.Using
 
 import com.huawei.Utils
 import com.huawei.GraphBLAS
@@ -59,33 +60,37 @@ object Pagerank {
 		// println(hostnames.map(t => t._2).flatten)
 
 		println("Now creating GraphBLAS launcher:")
-		val grb = new GraphBLAS( sc, P )
-		println("====================================")
-		println("  Now running GraphBLAS PageRank")
-		println("====================================")
+		Using( new GraphBLAS( sc, P ) ) { grb => {
+			println("====================================")
+			println("  Now running GraphBLAS PageRank")
+			println("====================================")
 
-		val t1 = System.nanoTime()
-		val output = grb.pagerank( args(1) )
-		println("====================================")
-		println("    GraphBLAS PageRank completed")
-		println("====================================")
-		val t2 = System.nanoTime()
-		println("output contents:")
-		println(output)
-		val t3 = System.nanoTime()
-		val maxpair = grb.max( output )
-		val t4 = System.nanoTime()
-		println("maximum PageRank entry:")
-		println(maxpair)
-		grb.destroy( output )
-		grb.exit()
-		println("GraphBLAS cleaned up.")
-		val time_taken = (System.nanoTime() - t0) / 1000000000.0
-		val t21 = (t2 - t1) / 1000000000.0
-		val t43 = (t4 - t3) / 1000000000.0
-		println( s"Accelerated PageRank call: $t21 seconds." )
-		println( s"Max extraction call: $t43 seconds." )
-		println( s"End-to-end time taken: $time_taken seconds." )
+			val t1 = System.nanoTime()
+			val output = grb.pagerank( args(1) )
+			println("====================================")
+			println("    GraphBLAS PageRank completed")
+			println("====================================")
+			val t2 = System.nanoTime()
+			println("output contents:")
+			println(output)
+			val t3 = System.nanoTime()
+			val maxpair = grb.max( output )
+			val t4 = System.nanoTime()
+			println("maximum PageRank entry:")
+			println(maxpair)
+			grb.destroy( output )
+			val ( iters: Int, time: Long ) = grb.getRunStats()
+			val avgTimeSecs = ( time.toDouble / iters.toDouble ) / 1000000000.0
+			println( s"Iterations: $iters, time per iteration: $avgTimeSecs seconds" )
+			// grb.close()
+			println("GraphBLAS cleaned up.")
+			val time_taken = (System.nanoTime() - t0) / 1000000000.0
+			val t21 = (t2 - t1) / 1000000000.0
+			val t43 = (t4 - t3) / 1000000000.0
+			println( s"Accelerated PageRank call: $t21 seconds." )
+			println( s"Max extraction call: $t43 seconds." )
+			println( s"End-to-end time taken: $time_taken seconds." )
+		} }
 	}
 }
 

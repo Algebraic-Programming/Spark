@@ -27,8 +27,9 @@ CXX=$(GRBCXX) -b $(GRB_BACKEND)
 
 JNI_INCLUDE=$(patsubst %/bin/javac, %, $(realpath $(shell which $(JAVAC))))/include
 
-# CPPFLAGS=-O3 -DNDEBUG -g -I $(JNI_INCLUDE) -I $(JNI_INCLUDE)/linux
-CPPFLAGS=-O0 -g -I $(JNI_INCLUDE) -I $(JNI_INCLUDE)/linux
+# OPT_FLAGS=-O0
+OPT_FLAGS=-O3 -DNDEBUG
+CPPFLAGS=-g -I $(JNI_INCLUDE) -I $(JNI_INCLUDE)/linux $(OPT_FLAGS)
 
 LFLAGS=
 

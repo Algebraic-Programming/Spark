@@ -18,6 +18,7 @@
 package com.huawei
 
 import java.lang.Exception
+import java.lang.AutoCloseable
 import scala.Option
 import scala.Some
 
@@ -28,11 +29,13 @@ import org.apache.spark.broadcast.Broadcast
 import com.huawei.Utils
 import com.huawei.graphblas.Native
 import com.huawei.graphblas.PIDMapper
+import scala.reflect.ClassTag
 
 // @SerialVersionUID(121L)
-class GraphBLAS( val sc: SparkContext, val P: Int ) {
+class GraphBLAS( val sc: SparkContext, val P: Int ) extends AutoCloseable {
 
 	GraphBLAS.markConstructed( this )
+	var initialized: Boolean = true
 	val unique_hostnames : Array[ String ] = GraphBLAS.getUniqueHostnames( sc, P )
 	val bcmap: Broadcast[ PIDMapper ] = sc.broadcast( GraphBLAS.getPIDMapper(sc, P, unique_hostnames ))
 	println( s"I detected ${bcmap.value.numProcesses} hosts." )
@@ -42,14 +45,14 @@ class GraphBLAS( val sc: SparkContext, val P: Int ) {
 		val bcm = bcmap
 		distributed_rdd.map {
 			node => {
-				val hostname: String = Utils.getHostnameUnique;
+				val hostname: String = Utils.getHostnameUnique();
 				val s: Int = bcm.value.processID( hostname );
 				(s, Native.begin(bcm.value.headnode, s, bcm.value.numProcesses));
 			}
 		}
-		.filter( x => x._2 != 0 ).collect.toArray
+		.filter( x => x._2 != 0 ).collect().toArray
 	}
-	terminateSequence
+	terminateSequence()
 	println("collected results:")
 	instances.foreach( n => {
 		println( s"host ${n._1} address: ${n._2}" )
@@ -113,18 +116,38 @@ class GraphBLAS( val sc: SparkContext, val P: Int ) {
 	//* GraphBLAS library functions *
 	//*******************************
 
-	def terminateSequence(): Unit = {
+	private def terminateSequence(): Unit = {
 		val terminated_count = distributed_rdd.map {
 			node => {
-				val hostname: String = Utils.getHostnameUnique();
 				Native.exitSequence();
-				hostname
+				node
 			}
-		}.count
+		}.count()
 		println( s"terminated $terminated_count nodes" )
 	}
 
+	private def logMessage( msg: String ): Unit = {
+		println( msg )
+	}
 
+	private def runDistributed[ OutT : ClassTag ]( fun: ( Broadcast[PIDMapper], Int, Boolean ) => OutT ): RDD[ OutT ] = {
+		val bcm = bcmap
+		val ret: RDD[ OutT ] = distributed_rdd.map {
+			pid => {
+				val hostname: String = Utils.getHostnameUnique();
+				val s: Int = bcm.value.processID( hostname );
+				val canEnter = Native.enterSequence()
+				fun( bcm, s, canEnter )
+			}
+		}
+		val c = ret.count()
+		if( c == 0) {
+			throw new Exception( "count is 0!" )
+		}
+		// .barrier()
+		terminateSequence()
+		ret
+	}
 
 	/**
 		* Frees any underlying GraphBLAS resources.
@@ -133,20 +156,24 @@ class GraphBLAS( val sc: SparkContext, val P: Int ) {
 		* manually.
 		*/
 	def exit() : Unit = {
-		val bcm = bcmap
-		val bci = bc_instances
-		val rdd_out = distributed_rdd.map {
-			node => {
-				val hostname: String = Utils.getHostnameUnique();
-				val s: Int = bcm.value.processID( hostname );
-				if( Native.enterSequence() ) {
-					val pointer_array: Array[(Int,Long)] = bci.value.filter( _._1 == s );
-					assert( pointer_array.size == 1 );
-					Native.end( pointer_array(0)._2 );
-				}
-			}
+		if ( !initialized ) {
+			return
 		}
-		terminateSequence
+		val bci = bc_instances
+		runDistributed( ( bcmap: Broadcast[PIDMapper], s: Int, isMain: Boolean ) => {
+			if( isMain ) {
+				val pointer_array: Array[(Int,Long)] = bci.value.filter( _._1 == s );
+				assert( pointer_array.size == 1 );
+				Native.end( pointer_array(0)._2 );
+			}
+		} )
+		initialized = false
+		GraphBLAS.removeConstructed( this )
+		logMessage( "closing GraphBLAS" )
+	}
+
+	def close(): Unit = {
+		exit()
 	}
 
 	/**
@@ -160,26 +187,26 @@ class GraphBLAS( val sc: SparkContext, val P: Int ) {
 		*
 		* @returns A handle to the distributed PageRank vector.
 		*/
-	def pagerank( filename: String ) : GraphBLAS.DenseVector = {
-		val bcm = bcmap
+	def pagerank( filename: String ) : Map[Int, Long] = {
+		// val bcm = bcmap
 		val bci = bc_instances
 		val fn = sc.broadcast( filename );
-		val rdd_out = distributed_rdd.map(
-			pid => {
-				val hostname: String = Utils.getHostnameUnique();
-				val s: Int = bcm.value.processID( hostname );
-				var ret: Long = 0;
-				if( Native.enterSequence() ) {
-					val pointer_array: Array[(Int,Long)] = bci.value.filter( _._1 == s );
-					assert( pointer_array.size == 1 );
-					ret = Native.execIO( pointer_array(0)._2, Native.PAGERANK_GRB_IO, fn.value );
-				}
-				(s, ret)
-			}
-		)
-		val v = new GraphBLAS.DenseVector( rdd_out.collect() )
-		terminateSequence
-		v
+		val fun = ( bcmap: Broadcast[PIDMapper], s: Int, isMain: Boolean ) => {
+			val ret = if( isMain ) {
+				val pointer_array: Array[(Int,Long)] = bci.value.filter( _._1 == s )
+				assert( pointer_array.size == 1 )
+				Native.execIO( pointer_array(0)._2, Native.PAGERANK_GRB_IO, filename )
+			} else 0L
+			(s, ret)
+		}
+		val rdd_out = runDistributed( fun ).filter( x => x._2 != 0L )
+		val arr = rdd_out.collect()
+		logMessage( "Collected data instances per node:" )
+		arr.foreach( l => {
+			logMessage( s"node ${l._1} value ${l._2}" )
+		})
+		terminateSequence()
+		arr.toMap
 	}
 
 	/**
@@ -192,26 +219,34 @@ class GraphBLAS( val sc: SparkContext, val P: Int ) {
 		* @returns A pair where the first element indicates an index and the second
 		*          its value.
 		*/
-	def max( vector: GraphBLAS.DenseVector ) : (Long, Double) = {
-		val bcm = bcmap
-		val rdd_out = distributed_rdd.map {
-			pid => {
-				val hostname: String = Utils.getHostnameUnique();
-				val s: Int = bcm.value.processID( hostname );
-				var index: Long = 0;
-				var value: Double = 0.0;
-				if( Native.enterSequence() ) {
-					index = Native.argmax( vector.data(s) );
-					value = Native.getValue( vector.data(s), index );
-				}
-				(index,value)
-			}
+	def max( vector: Map[Int, Long] ) : (Long, Double) = {
+		val fun = ( bcmap: Broadcast[PIDMapper], s: Int, isMain: Boolean ) => {
+			if( isMain ) {
+				val index = Native.argmax( vector(s) );
+				val value = Native.getValue( vector(s), index );
+				(index, value)
+			} else (-1L, 0.0)
 		}
-		terminateSequence
-		rdd_out.max()( new Ordering[Tuple2[Long,Double]]() {
+		val rdd_out = runDistributed( fun ).filter( x => x._1 != -1L )
+		val ret: (Long, Double) = rdd_out.max()( new Ordering[Tuple2[Long,Double]]() {
 			override def compare( x: (Long,Double), y: (Long,Double)): Int =
 				Ordering[Double].compare(x._2, y._2)
 		} )
+		ret
+	}
+
+	def getRunStats() : (Int, Long) = {
+		val fun = ( bcmap: Broadcast[PIDMapper], s: Int, isMain: Boolean ) => {
+			if( isMain ) {
+				val iters: Int = Native.getIterations;
+				val time: Long = Native.getTime;
+				(s, iters, time)
+			} else (s, -1, 0L)
+		}
+		val rdd_out = runDistributed( fun ).filter( x => x._1 == 0 && x._2 != -1 )
+		val arr = rdd_out.collect()
+		assert( arr.length == 1 )
+		( arr( 0 )._2, arr( 0 )._3 )
 	}
 
 	/**
@@ -221,18 +256,12 @@ class GraphBLAS( val sc: SparkContext, val P: Int ) {
 		* @param[in] instance The GraphBLAS context.
 		* @param[in] vector   The vector of which to find its maximum element.
 		*/
-	def destroy( vector: GraphBLAS.DenseVector ) : Unit = {
-		val bcm = bcmap
-		val rdd_out = distributed_rdd.map {
-			pid => {
-				val hostname: String = Utils.getHostnameUnique();
-				val s: Int = bcm.value.processID( hostname );
-				if( Native.enterSequence() ) {
-					Native.destroyVector( vector.data(s) );
-				}
+	def destroy( vector: Map[Int, Long] ) : Unit = {
+		runDistributed( ( bcmap: Broadcast[PIDMapper], s: Int, isMain: Boolean ) => {
+			if( isMain ) {
+				Native.destroyVector( vector(s) );
 			}
-		}
-		terminateSequence
+		} )
 	}
 
 	/**
@@ -325,13 +354,26 @@ object GraphBLAS {
 	private var context: Option[GraphBLAS] = None
 
 	private[huawei] def markConstructed(instance: GraphBLAS): Unit = {
-    lock.synchronized {
-		if( context.isDefined) {
-			throw new Exception( "GraphBLAS object already defined" )
+		lock.synchronized {
+			if( context.isDefined ) {
+				throw new Exception( "GraphBLAS object already defined" )
+			}
+			context = Some(instance)
 		}
-      context = Some(instance)
-    }
-  }
+	}
+
+	private[huawei] def removeConstructed(instance: GraphBLAS): Unit = {
+		lock.synchronized {
+			if( !context.isDefined ) {
+				throw new Exception( "GraphBLAS object not defined" )
+			}
+			if( context.get ne instance ) {
+				// should never get here!
+				throw new Exception( "GraphBLAS object not present" )
+			}
+			context = None
+		}
+	}
 
   	//**********************
 	//* Internal functions *
@@ -352,7 +394,7 @@ object GraphBLAS {
 			if( !bi.hasNext ) {
 				return false;
 			}
-			if( ai.next != bi.next ) {
+			if( ai.next() != bi.next() ) {
 				return false;
 			}
 		}
@@ -370,10 +412,10 @@ object GraphBLAS {
 		val subRDD = in.mapPartitions( iterator => {
 			val first = iterator.take(1);
 			if( first.hasNext ) {
-				if( first.next.startsWith( "%" ) ) {
+				if( first.next().startsWith( "%" ) ) {
 					val filtered = iterator.dropWhile( x => x.startsWith( "%" ) );
 					assert( filtered.hasNext ); //this could in principle fail if you are very very very unlucky. In that case, change the number of parts (decrease by 1, e.g.) and you should be fine.
-					val sz_header = filtered.next.split( " " );
+					val sz_header = filtered.next().split( " " );
 					println( sz_header.flatten )
 					assert( sz_header.size == 3 );
 					Iterator((sz_header.apply(0).toLong, sz_header.apply(1).toLong, sz_header.apply(2).toLong))
@@ -398,11 +440,11 @@ object GraphBLAS {
 	private def filterHeader( in: RDD[String] ): RDD[String] = {
 		in.mapPartitions( iterator => {
 			if( iterator.hasNext ) {
-				var line = iterator.next;
+				var line = iterator.next();
 				if( line.startsWith( "%" ) ) {
 					val filtered = iterator.dropWhile( x => x.startsWith( "%" ) );
 					assert( filtered.hasNext ); //see above comment
-					filtered.next;
+					filtered.next();
 					filtered
 				} else {
 					Iterator( line ) ++ iterator
@@ -566,7 +608,7 @@ object GraphBLAS {
 		val hosts = sc. statusTracker.getExecutorInfos.map( i => i.host )
 		println(hosts.toList)
 
-		val hostnames = sc.parallelize( hosts ).map{ pid => {Utils.getHostnameUnique() } }.collect().toArray
+		val hostnames = sc.parallelize( hosts.toSeq ).map{ pid => {Utils.getHostnameUnique() } }.collect().toArray
 
 		println( "--->>> hostnames:")
 		println( hostnames.toList )

@@ -35,12 +35,14 @@ object SparkPagerank {
 
 	@SerialVersionUID(100L)
 	class CyclicPartitioner( P: Int, n: Long ) extends Partitioner {
+
 		def getPartition( key: Any ): Int = {
 			val k = key.asInstanceOf[Long]
 			assert( k < n );
 			return k.toInt % P;
 		}
-		def numPartitions(): Int = P;
+
+		def numPartitions: Int = P;
 	}
 
 	/**
@@ -230,7 +232,7 @@ object SparkPagerank {
 		val read_time_taken = (System.nanoTime() - time) / 1000000000.0
 		println( s"Time taken for matrix load: $read_time_taken" )
 
-		val times: Array[Double] = new Array[Double]( 30 )
+		val times: Array[Double] = new Array[Double]( 5 )
 
 		println( "Starting dry run using default parameters..." )
 		val dry_t0 = System.nanoTime()
