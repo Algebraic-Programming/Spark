@@ -16,6 +16,7 @@
 
 import sys.process._
 import org.apache.spark.SparkEnv
+import java.net.InetAddress
 
 package com.huawei {
 
@@ -23,7 +24,8 @@ package com.huawei {
 
 
 		final def getHostname() : String = {
-			"hostname -f".!!.stripLineEnd
+			// "hostname -f".!!.stripLineEnd
+			java.net.InetAddress.getLocalHost().getCanonicalHostName()
 		}
 
 		final def getHostnameUnique() : String = {
