@@ -40,33 +40,29 @@ object Pagerank {
 	}
 
 	def main( args: Array[String] ): Unit = {
-		if( args.length != 2 ) {
-			println( "Usage: ./program_name <P> <matrix file>." );
+		if( args.length != 1 ) {
+			println( "Usage: ./program_name <matrix file>." );
 			return;
 		}
 		val conf = new SparkConf().setAppName( "Spark GraphBLAS Pagerank" )
-			.setMaster("spark://ascolari.lan.huaweirc.ch:7077")
-			.setExecutorEnv( "LPF_INIT", "NO")
-			.setExecutorEnv( "JAVA_HOME", "/home/ascolari/Projects/ALP-Spark/lpf_java_launcher" )
 		val sc = new SparkContext( conf );
 		println( "--> default parallelism: " + sc. defaultParallelism )
 
 
-		val P = args(0).toInt;
-		println( s"Using P = $P." )
+		// val P = args(0).toInt;
+		// println( s"Using P = $P." )
 		val t0 = System.nanoTime()
-		// val hostnames = sc.parallelize( 0 until P ).map{ pid => {(SparkEnv.get.executorId, Utils.getHostname())} }.collect().toArray
-		// println("Manual hostnames gathering at start of example:")
-		// println(hostnames.map(t => t._2).flatten)
+		println( s"reading from file ${args(0)}" )
+
 
 		println("Now creating GraphBLAS launcher:")
-		Using( new GraphBLAS( sc, P ) ) { grb => {
+		Using( new GraphBLAS( sc ) ) { grb => {
 			println("====================================")
 			println("  Now running GraphBLAS PageRank")
 			println("====================================")
 
 			val t1 = System.nanoTime()
-			val output = grb.pagerank( args(1) )
+			val output = grb.pagerank( args(0) )
 			println("====================================")
 			println("    GraphBLAS PageRank completed")
 			println("====================================")

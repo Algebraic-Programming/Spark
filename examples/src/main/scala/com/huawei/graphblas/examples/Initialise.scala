@@ -40,27 +40,27 @@ object Initialise {
 	}
 
 	def main( args: Array[String] ): Unit = {
-		if( args.length != 1 ) {
-			println( "Example requires number of parameters is passed as its first and only argument." );
-			return;
-		}
-		val env = Map("JAVA_HOME" -> "/home/ascolari/Projects/ALP-Spark/lpf_java_launcher")
-		val sc = new SparkContext("spark://ascolari.lan.huaweirc.ch:7077", "Example", null, Nil, env );
+		// if( args.length != 1 ) {
+		// 	println( "Example requires number of parameters is passed as its first and only argument." );
+		// 	return;
+		// }
+		val conf = new SparkConf().setAppName( "Spark GraphBLAS Initialise" )
 
-		val P = args(0).toInt;
-		println( s"Using P = $P." );
+		val sc = new SparkContext( conf );
+
+		// val P = args(0).toInt;
+		// println( s"Using P = $P." );
 		val t0 = System.nanoTime();
-		val hostnames = sc.parallelize( 0 until P ).map{ pid => {(SparkEnv.get.executorId, Utils.getHostnameUnique())} }.collect().toArray
-		println("Manual hostnames gathering at start of example:")
-		println(hostnames.map(t => t._2).flatten)
-		hostnames.foreach( c => {
-				println("--> exec ID " + c._1 + ", hostname " + c._2 )
-			}
-		)
+		// val hostnames = sc.parallelize( 0 until 1 ).map{ pid => {(SparkEnv.get.executorId, Utils.getHostnameUnique())} }.collect().toArray
+		// println("Manual hostnames gathering at start of example:")
+		// println(hostnames.map(t => t._2).flatten)
+		// hostnames.foreach( c => {
+		// 		println("--> exec ID " + c._1 + ", hostname " + c._2 )
+		// 	}
+		// )
 
 		println("Now creating GraphBLAS launcher:")
-		val grb = new GraphBLAS( sc, P )
-		Using( new GraphBLAS( sc, P ) ) { grb => {
+		Using( new GraphBLAS( sc ) ) { grb => {
 			println("grb instance contents:")
 			println(grb)
 			// println("GraphBLAS cleaned up.")

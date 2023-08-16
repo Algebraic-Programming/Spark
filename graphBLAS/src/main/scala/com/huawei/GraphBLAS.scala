@@ -32,15 +32,15 @@ import com.huawei.graphblas.PIDMapper
 import scala.reflect.ClassTag
 
 // @SerialVersionUID(121L)
-class GraphBLAS( val sc: SparkContext, val P: Int ) extends AutoCloseable {
+class GraphBLAS( val sc: SparkContext ) extends AutoCloseable {
 
 	GraphBLAS.markConstructed( this )
 	var initialized: Boolean = true
-	val unique_hostnames : Array[ String ] = GraphBLAS.getUniqueHostnames( sc, P )
-	val bcmap: Broadcast[ PIDMapper ] = sc.broadcast( GraphBLAS.getPIDMapper(sc, P, unique_hostnames ))
+	val (unique_hostnames, nprocs ) = GraphBLAS.getUniqueHostnames( sc )
+	val bcmap: Broadcast[ PIDMapper ] = sc.broadcast( GraphBLAS.getPIDMapper(sc, nprocs, unique_hostnames ))
 	println( s"I detected ${bcmap.value.numProcesses} hosts." )
 	println( s"I elected ${bcmap.value.headnode} as head node." )
-	val distributed_rdd = sc.parallelize( 0 until P )
+	val distributed_rdd = sc.parallelize( 0 until nprocs )
 	val instances: Array[ ( Int, Long ) ] =  {
 		val bcm = bcmap
 		distributed_rdd.map {
@@ -598,25 +598,35 @@ object GraphBLAS {
 
 	type Instance = ( Array[String], Broadcast[PIDMapper], Array[(Int, Long)] )
 
+	def getParallelism( sc: SparkContext ): Int = {
+		println( "--> default parallelism first: " + sc.defaultParallelism )
+		val seed = sc.parallelize( List(0, 1) ).map{ pid => {Utils.getHostnameUnique() } }.collect().toArray
+		println( "--> default parallelism after: " + sc.defaultParallelism )
+		sc.defaultParallelism
+	}
 
-	def getUniqueHostnames( sc: SparkContext, P: Int ) : Array[String] = {
-		val hostnames_prior = sc.parallelize( 0 until P ).map{ pid => {Utils.getHostnameUnique() } }.collect().toArray
-		hostnames_prior.foreach( { s =>
-			println( s"hostname is: $s" )
-		} )
-		println("keys")
-		val hosts = sc. statusTracker.getExecutorInfos.map( i => i.host )
-		println(hosts.toList)
 
-		val hostnames = sc.parallelize( hosts.toSeq ).map{ pid => {Utils.getHostnameUnique() } }.collect().toArray
+	def getUniqueHostnames( sc: SparkContext ) : ( Array[String], Int ) = {
+		val parallelism = getParallelism( sc )
+		val hostnames_prior = sc.parallelize( 0 until parallelism ).map{ pid => {Utils.getHostnameUnique() } }.collect().toArray
+		// hostnames_prior.foreach( { s =>
+		// 	println( s"hostname is: $s" )
+		// } )
+		// println("keys")
+		// val hosts = sc. statusTracker.getExecutorInfos.map( i => i.host )
+		// println(hosts.toList)
 
-		println( "--->>> hostnames:")
-		println( hostnames.toList )
-		val unique_hostnames = hostnames.distinct
+		// val hostnames = sc.parallelize( hosts.toSeq ).map{ pid => {Utils.getHostnameUnique() } }.collect().toArray
+		// println( "--> default parallelism 3: " + sc. defaultParallelism )
+
+		// println( "--->>> hostnames:")
+		// println( hostnames.toList )
+		val unique_hostnames = hostnames_prior.distinct
 		scala.util.Sorting.quickSort(unique_hostnames)
 		println( "--->>> distinct hostnames:")
 		println( unique_hostnames.toList )
-		unique_hostnames
+		// unique_hostnames
+		( unique_hostnames, parallelism )
 	}
 
 	def getPIDMapper( sc: SparkContext, P: Int, unique_hostnames: Array[ String ] ) : PIDMapper = {
