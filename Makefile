@@ -75,7 +75,7 @@ java_wrapper:
 	@mkdir -p lpf_java_wrapper/bin
 	@echo '#!/bin/bash' > lpf_java_wrapper/bin/java
 	@echo >> lpf_java_wrapper/bin/java
-	@echo '$(LPF_INSTALL_PATH)/bin/lpfrun -np 1 -engine mpimsg $(shell which $(JAVA)) $$@' >> lpf_java_wrapper/bin/java
+	@echo '$(LPF_INSTALL_PATH)/bin/lpfrun -np 1 -engine $(LPF_ENGINE) $(shell which $(JAVA)) $$@' >> lpf_java_wrapper/bin/java
 
 emit_config:
 	@echo

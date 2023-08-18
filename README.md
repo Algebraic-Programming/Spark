@@ -159,6 +159,12 @@ installation and finally the that of LPF installation. Both paths should be
 manually written in the file `${ALP_SPARK_PATH}/config.conf`, as values for the
 variables `SPARK_HOME`, `GRB_INSTALL_PATH` and `LPF_INSTALL_PATH`. Other
 variables usually do not need changes.
+Another important setting to consider is `LPF_ENGINE`, i.e., the LPF engine to
+be used, by default set to `mpimsg`; this choice ensures best interoperability
+because it leverages whatever communication channel the MPI installation can
+work with, but may not guarantee best performance.
+A better alternative for performance is the `ibverbs` engine, if available
+within LPF.
 You may refer to the comments inside `${ALP_SPARK_PATH}/config.conf` for more
 details.
 
