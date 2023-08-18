@@ -33,6 +33,7 @@ with the hybrid backend is ongoing.
 
 # Compile-time dependencies
 
+* LPF, for distributed execution; this, in turn, needs an MPI installation
 * ALP
 * JDK 11 or higher
 * Scala SDK version 2.13
@@ -40,26 +41,60 @@ with the hybrid backend is ongoing.
 
 # Prerequisites
 
+## LPF
+You should install a modified LPF version with a few fixes (under integration in
+the main branch) to better support the integration with Apache Spark; this
+version can be found in the `spark_fixes` branch.
+LPF, in turn, requires an MPI installation to be available.
+Theoretically all MPI implementations should work properly; however, OpenMPI
+does not currently work in practice due to a pending bug (at the time of
+writing - see OpenMPI's
+[GitHub issue](https://github.com/open-mpi/ompi/issues/6916)).
+Therefore, we strongly advise to use MPICH-derived implementations, although
+this may be different from the MPI implementation bundled with your network
+adapter (e.g., OFED).
+If an IBverbs library is available, the performance cost of a non-optimized MPI
+implementation should be negligible when using the `ibverbs` engine.
+
+You may compile it with the usual CMake workflow, optionally specifying several
+LPF-related options
+
+```bash
+git clone https://github.com/Algebraic-Programming/LPF.git -b spark_fixes
+cd LPF
+mkdir build
+export LPF_INSTALL_PATH=$(pwd)/install
+MPI_HOME=<path to MPI implementation> ../bootstrap.sh --prefix=${LPF_INSTALL_PATH} --disable-doc -DLPF_HWLOC=/usr/lib/$(uname -i)-linux-gnu/ -DLIB_IBVERBS=/usr/lib/$(uname -i)-linux-gnu/libibverbs.so
+make -j$(nprocs) install
+```
+
+where
+- `LPF_HWLOC` points to the HWloc library (usually in `/usr/lib/$(uname -i)-linux-gnu/`)
+- `LIB_IBVERBS` points to the IBverbs library (for InfiniBand devices only)
+
 ## ALP
 You can install and build ALP from the [GitHub repository](https://github.com/Algebraic-Programming/ALP.git),
 following the instructions in [its README](https://github.com/Algebraic-Programming/ALP#readme).
+For a distributed setup, the `spark_fixes` branch is needed, as it stores
+several modifications (to be integrated) for this scenario.
 In summary, you should clone, configure, build and install it according to a
 usual CMake workflow:
 
 ```bash
-git clone https://github.com/Algebraic-Programming/ALP
+git clone https://github.com/Algebraic-Programming/ALP -b spark_fixes
 cd ALP
 mkdir build
 cd build
-mkdir install # installation directory
-../bootstrap.sh --prefix=./install
-make -j$(nproc)
+export GRB_INSTALL_PATH=$(pwd)/install
+../bootstrap.sh --prefix=${GRB_INSTALL_PATH} --with-lpf=${LPF_INSTALL_PATH}
 make install -j$(nproc)
 ```
 
 Note that you can change the argument of the `--prefix` option to install ALP in
-any (empty) folder you may choose. For simplicity, from now on we will call this
-path `GRB_INSTALL_PATH`.
+any (empty) folder you may choose, and the `--with-lpf` option serves to point
+ALP to the LPF installation.
+For simplicity, from now on we will call the installation path as
+`GRB_INSTALL_PATH`.
 
 ## JDK 11
 You may tipically install JDK 11 from the packge management tool of your Linux
@@ -107,7 +142,7 @@ You should first clone this repository on this branch and enter the folder, if
 you haven't done so yet:
 
 ```bash
-git clone -b latest_scala https://github.com/Algebraic-Programming/Spark.git
+git clone -b alp_spark_distributed https://github.com/Algebraic-Programming/Spark.git
 cd Spark
 ALP_SPARK_PATH=$(pwd)
 ```
@@ -119,38 +154,48 @@ To compile the ALP/Spark prototype, two steps are needed, namely *configuration*
 and *compilation*. These are detailed in the following.
 
 ## Configuration
-ALP/Spark needs to know the path of the Spark installation and of the ALP
-installation. Both paths should be manually written in the file
-`${ALP_SPARK_PATH}/config.conf`, as values for the variables `SPARK_HOME` and
-`GRB_INSTALL_PATH`, respectively. Other variables usually do not need changes.
+ALP/Spark needs to know the path of the Spark installation, that of the ALP
+installation and finally the that of LPF installation. Both paths should be
+manually written in the file `${ALP_SPARK_PATH}/config.conf`, as values for the
+variables `SPARK_HOME`, `GRB_INSTALL_PATH` and `LPF_INSTALL_PATH`. Other
+variables usually do not need changes.
 You may refer to the comments inside `${ALP_SPARK_PATH}/config.conf` for more
 details.
 
 ## Compilation
 Simply issue `make` to produce `build/graphBLAS.jar` and `build/graphBLAS.so`.
+This command also produces the LPF-Java wrapper, i.e. the command spawning Java
+process as LPF processes (needed for distributed execution), stored in the
+`${ALP_SPARK_PATH}/lpf_java_wrapper` directory.
+Finally, it prints some options that should be manually inserted in the
+configuration file for spark executors `${SPARK_HOME}/conf/spark-defaults.conf`.
+Thes options add the JNI lookup paths to execute ALP native code from within
+the Spark application.
 
 # Running examples
 You first need to start Apache Spark in standalone or cluster mode, for which
 you may refer to the [official guide](https://spark.apache.org/docs/latest/).
-This example currently supports only the ALP shared-memory backend, which means
-that one worker only is supported. In particular, the easiest way is to
+
+As an example, Spark *standalone mode* allows manually spawning workers to
+multiple machines by listing the hostnames in `${SPARK_HOME}/conf/workers.conf`.
+Once this file is populated, the easiest way to
 [start it standalone](https://spark.apache.org/docs/latest/spark-standalone.html#starting-a-cluster-manually),
-for example:
+is:
 
 ```bash
 ${SPARK_HOME}/sbin/start-master.sh
-${SPARK_HOME}/sbin/start-worker.sh spark://$(hostname):7077
+${SPARK_HOME}/sbin/start-workers.sh
 ```
 
 Then you can submit ALP/Spark jobs to this master as normal Spark jobs, with
 some additional options for Spark to locate the binary and JAR files generated
 during compilation. The script `${ALP_SPARK_PATH}/run_examples.sh` shows
 these variables and automates their generation; you may refer to it for more
-details. This script also contains three examples, one of which is run. This
-example runs the PageRank algorithm on a matrix ingested from an input file
-via ALP, resulting in much faster runtime compared to the pure Spark
-implementation (second example -- commented). The example matrix used in the
-script is [gyro_m from the SuitSparse Matrix Collection](https://sparse.tamu.edu/Oberwolfach/gyro_m),
+details. This script also contains three examples to be selected via the command
+line. For instance, the first example runs the PageRank algorithm on a matrix
+ingested from an input file via ALP, resulting in much faster runtime compared
+to the pure Spark implementation (second example). The example matrix used in
+the script is [gyro_m from the SuitSparse Matrix Collection](https://sparse.tamu.edu/Oberwolfach/gyro_m),
 read in `Matrix Market` format.
 The quickest way to run the example is
 
@@ -158,8 +203,11 @@ The quickest way to run the example is
 cd ${ALP_SPARK_PATH}
 wget https://suitesparse-collection-website.herokuapp.com/MM/Oberwolfach/gyro_m.tar.gz
 tar -xf gyro_m.tar.gz
-./run_example.sh
+./run_example.sh 1
 ```
 
 Then, you may see the Spark log on the standard output, with information about
 the PageRank results.
+similarly, you may select other examples by changing the script argument.
+As a second argument (optional), you may pass the spark master URL; the default
+is `spark://$(hostname):7077`.

@@ -17,9 +17,9 @@
 
 include config.conf
 
-.PHONY: all clean install jars cpp_clean
+.PHONY: all clean install jars cpp_clean java_wrapper emit_config
 
-all: cpp_lib jars
+all: cpp_lib jars java_wrapper emit_config
 
 GRBCXX=$(GRB_INSTALL_PATH)/bin/grbcxx
 
@@ -69,4 +69,21 @@ cpp_clean:
 
 clean: cpp_clean
 	sbt clean
-	rm -rf build
+	rm -rf build lpf_java_wrapper &> /dev/null
+
+java_wrapper:
+	@mkdir -p lpf_java_wrapper/bin
+	@echo '#!/bin/bash' > lpf_java_wrapper/bin/java
+	@echo >> lpf_java_wrapper/bin/java
+	@echo '$(LPF_INSTALL_PATH)/bin/lpfrun -np 1 -engine mpimsg $(shell which $(JAVA)) $$@' >> lpf_java_wrapper/bin/java
+
+emit_config:
+	@echo
+	@echo "### you should place the following options inside <SPARK_HOME>/conf/spark-defaults.conf ###"
+	@echo
+	@echo "spark.executor.extraLibraryPath $(GRB_INSTALL_PATH)/lib:$(GRB_INSTALL_PATH)/lib/hybrid:$(shell pwd)/build # extra paths for libraries"
+	@echo "spark.executorEnv.LPF_INIT NO # do not init LPF automatically"
+	@echo "spark.executorEnv.JAVA_HOME $(shell pwd)/lpf_java_launcher # use the LPF-Java wrapper"
+	@echo
+#	@echo spark.scheduler.excludeOnFailure.unschedulableTaskSetTimeout 1000000000
+#	@echo spark.executor.memory 400g
