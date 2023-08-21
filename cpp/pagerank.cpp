@@ -25,13 +25,19 @@
 
 #include "sparkgrb.hpp"
 
+#include "pagerank.hpp"
 
-constexpr unsigned iters = 5;
+constexpr unsigned outer_iters = 5;
 using duration_t = std::chrono::time_point<std::chrono::high_resolution_clock>::duration;
 static duration_t pr_time = duration_t::zero();
+size_t iterations;
 
-unsigned get_pr_iterations() {
-	return iters;
+size_t get_pr_inner_iterations() {
+	return iterations;
+}
+
+size_t get_pr_outer_iterations() {
+	return outer_iters;
 }
 
 unsigned long get_pr_time() {
@@ -119,7 +125,7 @@ void grb_pagerank( const GrB_Input &data_in, GrB_Output &out ) {
 			&( out.iterations ), &( out.residual )
 		);
 		pr_time = duration_t::zero();
-		for( unsigned i = 0; i < iters; i++ ) {
+		for( unsigned i = 0; i < outer_iters; i++ ) {
 			grb::clear( pr );
 			auto start = std::chrono::high_resolution_clock::now();
 			out.error_code = grb::algorithms::simple_pagerank< grb::descriptors::no_operation >(
@@ -131,6 +137,7 @@ void grb_pagerank( const GrB_Input &data_in, GrB_Output &out ) {
 			auto end = std::chrono::high_resolution_clock::now();
 			pr_time += ( end - start );
 		}
+		iterations = out.iterations;
 
 		if( out.error_code != grb::SUCCESS ) {
 			std::string error_code = grb::toString( out.error_code );

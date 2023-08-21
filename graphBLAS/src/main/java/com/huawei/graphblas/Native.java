@@ -243,8 +243,11 @@ public class Native implements Serializable {
 
 	public static native void exitSequence();
 
-	public static native int getIterations();
+	public static native long getIterations();
 
 	public static native long getTime();
+
+	public static native long getOuterIterations();
+
 };
 

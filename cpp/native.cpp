@@ -18,6 +18,7 @@
 #include "com_huawei_graphblas_Native.h"
 #include "graphblas.hpp"
 #include "sparkgrb.hpp"
+#include "pagerank.hpp"
 
 #include <string>
 
@@ -389,14 +390,15 @@ JNIEXPORT void JNICALL Java_com_huawei_graphblas_Native_exitSequence(
 	already_initialized.store(false);
 }
 
-extern unsigned get_pr_iterations();
-
-extern unsigned long get_pr_time();
-
-JNIEXPORT jint JNICALL Java_com_huawei_graphblas_Native_getIterations(JNIEnv *, jclass) {
-	return static_cast< jint >( get_pr_iterations() );
+JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_getIterations(JNIEnv *, jclass) {
+	return static_cast< jlong >( get_pr_inner_iterations() );
 }
 
 JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_getTime(JNIEnv *, jclass) {
 	return static_cast< jlong >( get_pr_time() );
 }
+
+JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_getOuterIterations(JNIEnv *, jclass) {
+	return static_cast< jlong >( get_pr_outer_iterations() );
+}
+

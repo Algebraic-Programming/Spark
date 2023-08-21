@@ -75,9 +75,9 @@ object Pagerank {
 			println("maximum PageRank entry:")
 			println(maxpair)
 			grb.destroy( output )
-			val ( iters: Int, time: Long ) = grb.getRunStats()
-			val avgTimeSecs = ( time.toDouble / iters.toDouble ) / 1000000000.0
-			println( s"Iterations: $iters, time per iteration: $avgTimeSecs seconds" )
+			val ( iters: Long, outer: Long, time: Long ) = grb.getRunStats()
+			val avgTimeSecs = ( time.toDouble / outer.toDouble ) / 1000000000.0
+			println( s"Iterations: $iters, outer iterations: $outer, time per outer iteration: $avgTimeSecs seconds" )
 			// grb.close()
 			println("GraphBLAS cleaned up.")
 			val time_taken = (System.nanoTime() - t0) / 1000000000.0

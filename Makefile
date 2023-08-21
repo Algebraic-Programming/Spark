@@ -45,10 +45,10 @@ build/com_huawei_graphblas_Native.h: graphBLAS/src/main/java/com/huawei/graphbla
 	mkdir build || true
 	$(JAVAC) -cp java -d ./build -h ./build "$<"
 
-build/native.o: cpp/native.cpp build/com_huawei_graphblas_Native.h cpp/sparkgrb.hpp
+build/native.o: cpp/native.cpp build/com_huawei_graphblas_Native.h cpp/sparkgrb.hpp cpp/pagerank.hpp
 	${CXX} ${CPPFLAGS} -fPIC -Ibuild/ -I${GRB_INSTALL_PATH}/include/:./cpp/ -c -o "$@" "$<"
 
-build/pagerank.o: cpp/pagerank.cpp cpp/sparkgrb.hpp
+build/pagerank.o: cpp/pagerank.cpp cpp/sparkgrb.hpp cpp/pagerank.hpp
 	${CXX} ${CPPFLAGS} -fPIC -Ibuild/ -I${GRB_INSTALL_PATH}/include/:./cpp/ -c -o "$@" "$<"
 
 #This is an ugly workaround to an ALP bug (see GitHub issue 171)
@@ -87,3 +87,4 @@ emit_config:
 	@echo
 #	@echo spark.scheduler.excludeOnFailure.unschedulableTaskSetTimeout 1000000000
 #	@echo spark.executor.memory 400g
+
