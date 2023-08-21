@@ -225,7 +225,7 @@ object SparkPagerank {
 		ranks
 	}
 
-	def benchmark( sc: SparkContext, file: String, P: Int ): Unit = {
+	def benchmark( sc: SparkContext, file: String, P: Int, maxIters: Int ): Unit = {
 
 		var time = System.nanoTime()
 		val matrix: Matrix = new Matrix( sc, file, P, true )
@@ -261,6 +261,7 @@ object SparkPagerank {
 		if( args.length < 0 ) {
 			println( "Mandatory argument #1: number of parts input should be divided into." );
 			println( "Mandatory argument #2: checkpoint directory." );
+			println( "Mandatory argument #3: maximum number of iterations." );
 			println( "Program requires a number of processes followed by a list of matrix files as arguments." );
 			return;
 		}
@@ -271,6 +272,7 @@ object SparkPagerank {
 
 		val P = args(0).toInt;
 		val chkptdir = args(1);
+                val iters = args(2).toInt;
 
 		println( s"Pagerank example called with $P parts for matrix and vector segments." );
 		println( s"Pagerank example called using $chkptdir as checkpoint directory." );
@@ -282,10 +284,10 @@ object SparkPagerank {
 		val nodes = mapper.numProcesses()
 		println( s"I detected $nodes individual worker nodes." );
 
-		val datafiles = args.drop(2);
+		val datafiles = args.drop(3);
 		datafiles.foreach( x => {
 			println( s"Starting benchmark using $x" );
-			benchmark( sc, x, P );
+			benchmark( sc, x, P, iters );
 		} );
 	}
 
