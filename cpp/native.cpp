@@ -298,10 +298,9 @@ JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_argmax( JNIEnv * env, j
 		curmaxi = static_cast< size_t >( -1 );
 	} else {
 		curmaxi = pointer->getNonzeroIndex( 0 );
-		double curmax = pointer->getNonzeroValue( curmaxi );
+		double curmax = pointer->getNonzeroValue( 0 );
 		for( size_t i = 1; i < nnz; ++i ) {
 			const size_t index = pointer->getNonzeroIndex( i );
-			// const double curval = pointer->getNonzeroValue( index );
 			const double curval = pointer->getNonzeroValue( i );
 			if( curval > curmax ) {
 				curmaxi = index;
