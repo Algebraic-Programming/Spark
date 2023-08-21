@@ -18,6 +18,7 @@
 #include <string>
 #include <stdlib.h>
 #include <chrono>
+#include <limits>
 
 #include "graphblas/algorithms/simple_pagerank.hpp"
 #include "graphblas/utils/parser/MatrixFileReader.hpp"
@@ -52,6 +53,10 @@ void grb_pagerank( const GrB_Input &data_in, GrB_Output &out ) {
 	const size_t P = grb::spmd<>::nprocs();
 	const size_t omP = grb::config::OMP::threads();
 	assert( s < P );
+	out.error_code = grb::PANIC;
+	out.iterations = std::numeric_limits< size_t >::max();
+	out.residual = std::numeric_limits< double >::infinity();
+	out.pinnedVector = nullptr;
 #ifdef FILE_LOGGING
 	std::string fp = getenv("HOME");
 	fp += "/graphblastest.txt";
@@ -151,6 +156,7 @@ void grb_pagerank( const GrB_Input &data_in, GrB_Output &out ) {
 		(void) fprintf( file, "Got exception: %s\n", e.what() );
 		(void) fflush( file );
 #endif
+		out.error_code = grb::PANIC;
 	}
 
 #ifdef FILE_LOGGING
