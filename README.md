@@ -193,27 +193,41 @@ ${SPARK_HOME}/sbin/start-master.sh
 ${SPARK_HOME}/sbin/start-workers.sh
 ```
 
-Then you can submit ALP/Spark jobs to this master as normal Spark jobs, with
-some additional options for Spark to locate the binary and JAR files generated
-during compilation. The script `${ALP_SPARK_PATH}/run_examples.sh` shows
-these variables and automates their generation; you may refer to it for more
-details. This script also contains three examples to be selected via the command
-line. For instance, the first example runs the PageRank algorithm on a matrix
-ingested from an input file via ALP, resulting in much faster runtime compared
-to the pure Spark implementation (second example). The example matrix used in
-the script is [gyro_m from the SuitSparse Matrix Collection](https://sparse.tamu.edu/Oberwolfach/gyro_m),
+Then you can submit ALP/Spark jobs to this master as normal Spark jobs. The
+script `${ALP_SPARK_PATH}/run_examples.sh` contains several examples to be
+selected via the command line, numbered 1 to 5:
+
+1. initialises the Spark/ALP setup, for debugging purposes
+2. run PageRank in pure Spark implementation
+3. run Pagerank in ALP/Spark implementation
+4. run GraphX Pagerank, uncorrected (i.e., with uncorrect values for dangling nodes)
+5. run GraphX Pagerank, corrected
+
+The example matrix used in the script is
+[gyro_m from the SuitSparse Matrix Collection](https://sparse.tamu.edu/Oberwolfach/gyro_m),
 read in `Matrix Market` format.
-The quickest way to run the example is
+The quickest way to run, e.g., example 3 is
 
 ```bash
 cd ${ALP_SPARK_PATH}
 wget https://suitesparse-collection-website.herokuapp.com/MM/Oberwolfach/gyro_m.tar.gz
 tar -xf gyro_m.tar.gz
-./run_example.sh 1
+./run_example.sh 3
 ```
 
 Then, you may see the Spark log on the standard output, with information about
 the PageRank results.
-similarly, you may select other examples by changing the script argument.
-As a second argument (optional), you may pass the spark master URL; the default
-is `spark://$(hostname):7077`.
+More options are available for the `/run_example.sh` script, which you may
+see with
+
+```bash
+./run_example.sh --help
+```
+
+for example, to run example 4., with 192 partitions for the input RDD,
+persisting data in `./spark_persistence` and analyzing
+`./matrices/gyro_m/gyro_m.mtx`:
+
+```bash
+./run_example.sh --partitions 192 --persistence ./spark_persistence --dataset ./matrices/gyro_m/gyro_m.mtx 4
+```

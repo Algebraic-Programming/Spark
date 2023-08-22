@@ -3,5 +3,5 @@
 target
 */target
 build
-lpf_java_wrapper
+lpf_java_launcher
 spark_persistence

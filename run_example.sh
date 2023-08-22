@@ -1,12 +1,41 @@
 #!/bin/bash
 
+function print_help {
+    echo "usage run_example.sh [<options>...] <example number, 1-5>"
+    echo "--dataset <path to input dataset>"
+    echo "--master_url <URL to Spark master>"
+    echo "--persistence <path to directory for the persistence to Spark RDDs>"
+    echo "--partitions <number of input partitions>"
+}
+
+CDIR="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
+
+source ${CDIR}/config.conf
+
+dataset=""
+master_url=""
+persistence=""
+partitions=""
+iterations="52"
+run="no"
+while true; do
+  case "$1" in
+    --help ) print_help; exit;;
+    --dataset ) dataset="$2"; run="yes"; shift 2;;
+    --master ) master_url="$2"; shift 2;;
+    --persistence ) persistence="$2"; shift 2;;
+    --partitions ) partitions="$2"; shift 2;;
+    --* ) echo "unrecognized option: $1"; exit 1;;
+    * ) break ;;
+  esac
+done
+
 example_num=$1
-master_url=$2
 
 re='^[0-9]+$'
 if [[ ! "${example_num}" =~ ${re} ]] ; then
    echo "error: argument is not a number"
-   echo "usage: $0 <example number, 1-5> [<Spark master URL>]"
+   print_help
    exit 1
 fi
 
@@ -15,15 +44,10 @@ if ((example_num < 1 || example_num > 5)); then
     exit 1
 fi
 
-CDIR="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
-
-source ${CDIR}/config.conf
-
 if [[ -z "${master_url}" ]]; then
-	master_url="spark://$(hostname):7077"
+    master_url="spark://$(hostname):7077"
 fi
 
-# additional paths for Spark to locate for ALP and ALP/Spark binaries
 
 # additional path for Spark to locate ALP/Spark JARs
 ALP_BIN_JARS="--jars ${CDIR}/build/graphBLAS.jar"
@@ -34,34 +58,57 @@ CMD_BASE="${SPARK_HOME}/bin/spark-submit ${ALP_BIN_JARS} --master ${master_url}"
 case "${example_num}" in
 # Example 1: test only initialization for ALP/Spark
     1)
-        ARGS="--class com.huawei.graphblas.examples.Initialise build/examples.jar "
+        run="yes"
+        ARGS="--class com.huawei.graphblas.examples.Initialise ${CDIR}/build/examples.jar"
         ;;
 # Example 2: run PageRank in pure Spark implementation
     2)
-	mkdir $(pwd)/spark_persistence
-        ARGS="--class com.huawei.graphblas.examples.SparkPagerank build/examples.jar 192 $(pwd)/spark_persistence 52 /storage/datasets/graphs-and-sparse-matrices/gyro_m.mtx"
-        #ARGS="--class com.huawei.graphblas.examples.SparkPagerank build/examples.jar 192 $(pwd)/spark_persistence 55 /storage/datasets/graphs-and-sparse-matrices/wikipedia-20070206.mtx"
-        #ARGS="--class com.huawei.graphblas.examples.SparkPagerank build/examples.jar 192 $(pwd)/spark_persistence 73 /storage/datasets/graphs-and-sparse-matrices/uk-2002.mtx"
+        if [[ ! -z "${partitions}" && ! -z "${persistence}" && ! -z "${dataset}" ]]; then
+            run="yes"
+        else
+            dataset="<path to input dataset>"
+            master_url="<URL to Spark master>"
+            persistence="<path to directory for the persistence to Spark RDDs>"
+            partitions="<number of input partitions>"
+        fi
+        ARGS="--class com.huawei.graphblas.examples.SparkPagerank ${CDIR}/build/examples.jar ${partitions} ${persistence} ${iterations} ${dataset}"
         ;;
 # Example 3: run Pagerank in ALP/Spark implementation
     3)
-        ARGS="--class com.huawei.graphblas.examples.Pagerank build/examples.jar /storage/datasets/graphs-and-sparse-matrices/gyro_m.mtx"
-        #ARGS="--class com.huawei.graphblas.examples.Pagerank build/examples.jar /storage/datasets/graphs-and-sparse-matrices/wikipedia-20070206.mtx"
-        #ARGS="--class com.huawei.graphblas.examples.Pagerank build/examples.jar /storage/datasets/graphs-and-sparse-matrices/uk-2002.mtx"
+        if [[ ! -z "${dataset}" ]]; then
+            run="yes"
+        else
+            dataset="<path to input dataset>"
+            master_url="<URL to Spark master>"
+            persistence="<path to directory for the persistence to Spark RDDs>"
+            partitions="<number of input partitions>"
+        fi
+        ARGS="--class com.huawei.graphblas.examples.Pagerank ${CDIR}/build/examples.jar ${dataset}"
         ;;
 # Example 4: run GraphX Pagerank, uncorrected
     4)
-	mkdir $(pwd)/spark_persistence
-        ARGS="--class com.huawei.graphblas.examples.GraphXPageRank build/examples.jar $(pwd)/spark_persistence 52 false /storage/datasets/graphs-and-sparse-matrices/gyro_m.mtx"
-        #ARGS="--class com.huawei.graphblas.examples.GraphXPageRank build/examples.jar $(pwd)/spark_persistence 55 false /storage/datasets/graphs-and-sparse-matrices/wikipedia-20070206.mtx"
-        #ARGS="--class com.huawei.graphblas.examples.GraphXPageRank build/examples.jar $(pwd)/spark_persistence 73 false /storage/datasets/graphs-and-sparse-matrices/uk-2002.mtx"
+        if [[ ! -z "${persistence}" && ! -z "${dataset}" ]]; then
+            run="yes"
+        else
+            dataset="<path to input dataset>"
+            master_url="<URL to Spark master>"
+            persistence="<path to directory for the persistence to Spark RDDs>"
+            partitions="<number of input partitions>"
+        fi
+        ARGS="--class com.huawei.graphblas.examples.GraphXPageRank ${CDIR}/build/examples.jar ${persistence} ${iterations} false ${dataset}"
         ;;
 # Example 5: run GraphX Pagerank, corrected (to be confirmed with GraphX source)
     5)
-	mkdir $(pwd)/spark_persistence
-        ARGS="--class com.huawei.graphblas.examples.GraphXPageRank build/examples.jar $(pwd)/spark_persistence 52 true /storage/datasets/graphs-and-sparse-matrices/gyro_m.mtx"
-        #ARGS="--class com.huawei.graphblas.examples.GraphXPageRank build/examples.jar $(pwd)/spark_persistence 55 true /storage/datasets/graphs-and-sparse-matrices/wikipedia-20070206.mtx"
-        #ARGS="--class com.huawei.graphblas.examples.GraphXPageRank build/examples.jar $(pwd)/spark_persistence 73 true /storage/datasets/graphs-and-sparse-matrices/uk-2002.mtx"
+        if [[ ! -z "${persistence}" && ! -z "${dataset}" ]]; then
+            run="yes"
+        else
+            dataset="<path to input dataset>"
+            master_url="<URL to Spark master>"
+            persistence="<path to directory for the persistence to Spark RDDs>"
+            partitions="<number of input partitions>"
+            iterations="<number of iterations>"
+        fi
+        ARGS="--class com.huawei.graphblas.examples.GraphXPageRank ${CDIR}/build/examples.jar ${persistence} ${iterations} true ${dataset}"
         ;;
     *)
         echo "unknown example number: ${example_num}"
@@ -75,4 +122,6 @@ echo "Running: ===>"
 echo ${CMD}
 echo "<==="
 
-${CMD}
+if [[ "${run}" == "yes" ]]; then
+    ${CMD}
+fi
