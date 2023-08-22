@@ -34,7 +34,7 @@ object GraphXPageRank {
                 val matrix = Utils.readMM( sc, file )
                 println( "Matrix is " + matrix._1 + " by " + matrix._2 + " and has " + matrix._3 + " nonzeroes." );
                 println( "Checksum (matrix rows): " + matrix._4.count() );
-                val graphXmat = Utils.matrix2GraphX( matrix )
+                val graphXmat = Utils.matrix2GraphX( sc, matrix )
                 println( "GraphX: #edges is " + graphXmat.numEdges + ", #vertices is " + graphXmat.numVertices );
 		for( i <- 1 to times.size ) {
 			val time: Long = System.nanoTime()

@@ -199,10 +199,29 @@ package com.huawei {
 	 *          index, while the second entry is an array of column indices with
 	 *          nonzeroes on that row.
 	 */
-	def readPatternMatrix( sc: org.apache.spark.SparkContext, fn: String, P: Int = 0 ) : org.apache.spark.rdd.RDD[ (Long, Iterable[Long] ) ] = {
-		val file = if(P == 0) sc.textFile(fn) else sc.textFile(fn,P);
-		file.filter( word => word(0) != '%' ).mapPartitionsWithIndex{ (idx,iter) => if (idx == 0 ) iter.drop(1) else iter}.map( x => x.split( " " ) ).map( x => (x(0).toLong,x(1).toLong) ).groupBy( x => x._1 ).map( x => (x._1, x._2.map( y => y._2 )) )
+	private def readGenPatternMatrix( sc: org.apache.spark.SparkContext, fn: String, P: Int = 0 ) : org.apache.spark.rdd.RDD[ (Long, Iterable[Long], Iterable[Double] ) ] = {
+		val file = if(P == 0) sc.textFile(fn) else sc.textFile( fn, P )
+                val parsed = filterHeader( file )
+		parsed.filter( x => !x.startsWith( "%" ) ).map( parseTriple ).groupBy( x => x._1 ).map( x => packTriples( x._1, x._2 ) )
 	}
+
+        private def readSymPatternMatrix( sc: org.apache.spark.SparkContext, fn: String, P: Int = 0 ) : org.apache.spark.rdd.RDD[ (Long, Iterable[Long], Iterable[Double] ) ] = {
+                val file = if(P == 0) sc.textFile( fn ) else sc.textFile( fn, P )
+                val parsed = filterHeader( file )
+                parsed.filter( x => !x.startsWith("%") ).flatMap( parseSymTriple ).groupBy( x => x._1 ).map( x => packTriples( x._1, x._2 ) )
+        }
+
+        private def readPatternMatrix( sc : org.apache.spark.SparkContext, fn: String, symmetric: Boolean ) : (Long, Long, Long, org.apache.spark.rdd.RDD[ (Long, Iterable[Long], Iterable[Double]) ]) = {
+		val fnRDD = sc.textFile( fn )
+		val header = parseHeader( fnRDD )
+                var retRDD: org.apache.spark.rdd.RDD[ (Long, Iterable[Long], Iterable[Double]) ] = null
+                if( symmetric ) {
+                  retRDD = readSymPatternMatrix( sc, fn )
+                } else {
+                  retRDD = readGenPatternMatrix( sc, fn )
+                }
+                ( header._1, header._2, header._3, retRDD )
+        }
 
         def readMM( sc: org.apache.spark.SparkContext, fn: String ) : (Long, Long, Long, org.apache.spark.rdd.RDD[ (Long, Iterable[Long], Iterable[Double]) ]) = {
           val file = Source.fromFile( fn )
@@ -213,8 +232,16 @@ package com.huawei {
             throw new Exception( "Expected a MatrixMarket matrix object" )
           if( !line.contains( "coordinate" ) )
             throw new Exception( "This parser only understands coordinate MatrixMarket formats" )
-          if( line.contains( "pattern" ) )
-            throw new Exception( "This parser has no support for pattern MatrixMarket formats" )
+          if( line.contains( "pattern" ) ) {
+            if( line.contains( "symmetric" ) ) {
+              println( "Symmetric pattern MatrixMarket matrix detected; parsing..." )
+              return readPatternMatrix( sc, fn, true )
+            } else {
+              if( !line.contains( "general" ) )
+                throw new Exception( "This parser only supports symmetric or general (pattern) MatrixMarket formats" )
+              return readPatternMatrix( sc, fn, false )
+            }
+          }
           if( line.contains( "symmetric" ) ) {
             println( "Symmetric MatrixMarket matrix detected; parsing..." )
             return readSymCoordMatrix( sc, fn )
@@ -231,15 +258,17 @@ package com.huawei {
           } )
         }
 
-        private def matrix2GraphXVertex( in: (Long, Long, Long, org.apache.spark.rdd.RDD[ (Long, Iterable[Long], Iterable[Double]) ]) ) : org.apache.spark.rdd.RDD[(Long,Double)] = {
-          in._4.map( row => (row._1, 0) )
+        private def matrix2GraphXVertex( sc: org.apache.spark.SparkContext, in: (Long, Long, Long, org.apache.spark.rdd.RDD[ (Long, Iterable[Long], Iterable[Double]) ]) ) : org.apache.spark.rdd.RDD[(Long,Double)] = {
+          if( in._1 != in._2 )
+            throw new Exception( "Input matrix is not square!" )
+          sc.range( 1, in._1 + 1 ).map( x => ( x, 0.0 ) )
         }
 
-        def matrix2GraphX( in: (Long, Long, Long, org.apache.spark.rdd.RDD[ (Long, Iterable[Long], Iterable[Double]) ]) ) : Graph[Double,Double] = {
+        def matrix2GraphX( sc: org.apache.spark.SparkContext, in: (Long, Long, Long, org.apache.spark.rdd.RDD[ (Long, Iterable[Long], Iterable[Double]) ]) ) : Graph[Double,Double] = {
           val edges = matrix2GraphXEdge( in )
           println( "Loading " + edges.count() + " nonzeroes into GraphX" );
           Graph(
-            matrix2GraphXVertex( in ),
+            matrix2GraphXVertex( sc, in ),
             edges
           )
         }
