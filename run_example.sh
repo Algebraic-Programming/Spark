@@ -41,6 +41,7 @@ case "${example_num}" in
 	mkdir $(pwd)/spark_persistence
         ARGS="--class com.huawei.graphblas.examples.SparkPagerank build/examples.jar 192 $(pwd)/spark_persistence 52 /storage/datasets/graphs-and-sparse-matrices/gyro_m.mtx"
         #ARGS="--class com.huawei.graphblas.examples.SparkPagerank build/examples.jar 192 $(pwd)/spark_persistence 55 /storage/datasets/graphs-and-sparse-matrices/wikipedia-20070206.mtx"
+        #ARGS="--class com.huawei.graphblas.examples.SparkPagerank build/examples.jar 192 $(pwd)/spark_persistence 73 /storage/datasets/graphs-and-sparse-matrices/uk-2002.mtx"
         ;;
 # Example 3: run Pagerank in ALP/Spark implementation
     3)
@@ -53,12 +54,14 @@ case "${example_num}" in
 	mkdir $(pwd)/spark_persistence
         ARGS="--class com.huawei.graphblas.examples.GraphXPageRank build/examples.jar $(pwd)/spark_persistence 52 false /storage/datasets/graphs-and-sparse-matrices/gyro_m.mtx"
         #ARGS="--class com.huawei.graphblas.examples.GraphXPageRank build/examples.jar $(pwd)/spark_persistence 55 false /storage/datasets/graphs-and-sparse-matrices/wikipedia-20070206.mtx"
+        #ARGS="--class com.huawei.graphblas.examples.GraphXPageRank build/examples.jar $(pwd)/spark_persistence 73 false /storage/datasets/graphs-and-sparse-matrices/uk-2002.mtx"
         ;;
 # Example 5: run GraphX Pagerank, corrected (to be confirmed with GraphX source)
     5)
 	mkdir $(pwd)/spark_persistence
         ARGS="--class com.huawei.graphblas.examples.GraphXPageRank build/examples.jar $(pwd)/spark_persistence 52 true /storage/datasets/graphs-and-sparse-matrices/gyro_m.mtx"
         #ARGS="--class com.huawei.graphblas.examples.GraphXPageRank build/examples.jar $(pwd)/spark_persistence 55 true /storage/datasets/graphs-and-sparse-matrices/wikipedia-20070206.mtx"
+        #ARGS="--class com.huawei.graphblas.examples.GraphXPageRank build/examples.jar $(pwd)/spark_persistence 73 true /storage/datasets/graphs-and-sparse-matrices/uk-2002.mtx"
         ;;
     *)
         echo "unknown example number: ${example_num}"
