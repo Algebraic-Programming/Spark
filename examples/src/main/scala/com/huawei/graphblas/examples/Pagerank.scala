@@ -18,6 +18,7 @@
 
 package com.huawei.graphblas.examples
 
+import java.io.File
 import org.apache.spark.SparkEnv
 import org.apache.spark.SparkConf
 import org.apache.spark.SparkContext
@@ -52,7 +53,13 @@ object Pagerank {
 		// val P = args(0).toInt;
 		// println( s"Using P = $P." )
 		val t0 = System.nanoTime()
-		println( s"reading from file ${args(0)}" )
+		val infile: File = new File( args(0) );
+		if( !infile.exists() || infile.isDirectory()) { 
+			println( s"cannot access file ${args(0)}, or is a directory" )
+			return
+		}
+		val filePath = infile.getAbsolutePath()
+		println( s"reading from file ${filePath}" )
 
 
 		println("Now creating GraphBLAS launcher:")
@@ -62,7 +69,7 @@ object Pagerank {
 			println("====================================")
 
 			val t1 = System.nanoTime()
-			val output = grb.pagerank( args(0) )
+			val output = grb.pagerank( filePath )
 			println("====================================")
 			println("    GraphBLAS PageRank completed")
 			println("====================================")
