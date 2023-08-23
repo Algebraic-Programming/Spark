@@ -16,7 +16,7 @@ dataset=""
 master_url=""
 persistence=""
 partitions=""
-iterations="52"
+iterations="10"
 run="no"
 while true; do
   case "$1" in
@@ -25,6 +25,7 @@ while true; do
     --master ) master_url="$2"; shift 2;;
     --persistence ) persistence="$2"; shift 2;;
     --partitions ) partitions="$2"; shift 2;;
+    --iterations ) iterations="$2"; shift 2;;
     --* ) echo "unrecognized option: $1"; exit 1;;
     * ) break ;;
   esac
@@ -59,6 +60,7 @@ case "${example_num}" in
 # Example 1: test only initialization for ALP/Spark
     1)
         run="yes"
+        echo "Info: this is a basic check of the ALP/Spark integration."
         ARGS="--class com.huawei.graphblas.examples.Initialise ${CDIR}/build/examples.jar"
         ;;
 # Example 2: run PageRank in pure Spark implementation
@@ -71,6 +73,7 @@ case "${example_num}" in
             persistence="<path to directory for the persistence to Spark RDDs>"
             partitions="<number of input partitions>"
         fi
+        echo "Info: this is a true PageRank using native Spark RDDs, which runs to convergence OR to the given max. number of iterations ${iterations}."
         ARGS="--class com.huawei.graphblas.examples.SparkPagerank ${CDIR}/build/examples.jar ${partitions} ${persistence} ${iterations} ${dataset}"
         ;;
 # Example 3: run Pagerank in ALP/Spark implementation
@@ -83,6 +86,7 @@ case "${example_num}" in
             persistence="<path to directory for the persistence to Spark RDDs>"
             partitions="<number of input partitions>"
         fi
+        echo "Info: this is a true PageRank using ALP/Spark which runs to convergence. Any given number of iterations is ignored."
         ARGS="--class com.huawei.graphblas.examples.Pagerank ${CDIR}/build/examples.jar ${dataset}"
         ;;
 # Example 4: run GraphX Pagerank, uncorrected
@@ -95,6 +99,7 @@ case "${example_num}" in
             persistence="<path to directory for the persistence to Spark RDDs>"
             partitions="<number of input partitions>"
         fi
+        echo "Info: this is a PageRank-like (Pregel variant) of the Spark GraphX page ranking, which runs for ${iterations} iterations."
         ARGS="--class com.huawei.graphblas.examples.GraphXPageRank ${CDIR}/build/examples.jar ${persistence} ${iterations} false ${dataset}"
         ;;
 # Example 5: run GraphX Pagerank, normalised (still the Pregel variant)
@@ -108,6 +113,7 @@ case "${example_num}" in
             partitions="<number of input partitions>"
             iterations="<number of iterations>"
         fi
+        echo "Info: this is a PageRank-like (Pregel variant, with normalization) of the Spark GraphX page ranking, which runs for ${iterations} iterations."
         ARGS="--class com.huawei.graphblas.examples.GraphXPageRank ${CDIR}/build/examples.jar ${persistence} ${iterations} true ${dataset}"
         ;;
     *)
