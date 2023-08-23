@@ -28,8 +28,8 @@ CXX=$(GRBCXX) -b $(GRB_BACKEND)
 JNI_INCLUDE=$(patsubst %/bin/javac, %, $(realpath $(shell which $(JAVAC))))/include
 
 # OPT_FLAGS=-O0
-OPT_FLAGS=-O3 -DNDEBUG
-CPPFLAGS=-g -I $(JNI_INCLUDE) -I $(JNI_INCLUDE)/linux $(OPT_FLAGS)
+OPT_FLAGS=-O3 -DNDEBUG #-DFILE_LOGGING
+CPPFLAGS=-g -I $(JNI_INCLUDE) -I $(JNI_INCLUDE)/linux $(OPT_FLAGS) -Wall -Wextra
 
 LFLAGS=
 
@@ -75,6 +75,7 @@ lpf_java_launcher:
 	@mkdir -p lpf_java_launcher/bin
 	@echo '#!/bin/bash' > lpf_java_launcher/bin/java
 	@echo >> lpf_java_launcher/bin/java
+	@echo 'unset OMP_NUM_THREADS' >> lpf_java_launcher/bin/java
 	@echo '$(LPF_INSTALL_PATH)/bin/lpfrun -np 1 -engine $(LPF_ENGINE) $(shell which $(JAVA)) $$@' >> lpf_java_launcher/bin/java
 	@chmod +x lpf_java_launcher/bin/java
 
