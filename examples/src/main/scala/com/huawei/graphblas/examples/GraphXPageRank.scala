@@ -28,7 +28,7 @@ import com.huawei.Utils
 
 object GraphXPageRank {
 
-	def benchmark( sc: SparkContext, file: String, iters: Int, corrected: Boolean ): Unit = {
+	def benchmark( sc: SparkContext, file: String, iters: Int, normalized: Boolean ): Unit = {
                 val outerIt: Int = 5
 		val times: Array[Double] = new Array[Double]( outerIt )
                 val matrix = Utils.readMM( sc, file )
@@ -43,7 +43,7 @@ object GraphXPageRank {
                         //val pr = graphXmat.pageRank( 0.0000001, 0.15 )
                         //val pr = org.apache.spark.graphx.lib.PageRank.runUntilConvergence( graphXmat, 0.0000001, 0.15 )
                         // the below variant does do something quite different
-                        val pr = org.apache.spark.graphx.lib.PageRank.runWithOptions( graphXmat, iters, 0.15, None, corrected )
+                        val pr = org.apache.spark.graphx.lib.PageRank.runWithOptions( graphXmat, iters, 0.15, None, normalized )
                         checksum = (pr.vertices.count(), pr.vertices.map( x => x._2 ).max())
 			val time_taken: Double = (System.nanoTime() - time) / 1000000000.0
 			times(i-1) = time_taken
@@ -59,12 +59,12 @@ object GraphXPageRank {
 		val sc = new SparkContext( sconf );
 		val chkptdir = args(0);
                 val iters: Int = args(1).toInt;
-                val corrected: Boolean = args(2).toBoolean;
+                val normalized: Boolean = args(2).toBoolean;
 		sc.setCheckpointDir( chkptdir );
 		val datafiles = args.drop(3);
 		datafiles.foreach( x => {
 			println( s"Starting benchmark using $x" );
-			benchmark( sc, x, iters, corrected );
+			benchmark( sc, x, iters, normalized );
 		} );
         }
 }
