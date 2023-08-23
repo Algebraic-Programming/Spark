@@ -60,7 +60,7 @@ case "${example_num}" in
 # Example 1: test only initialization for ALP/Spark
     1)
         run="yes"
-        echo "Info: this is a basic check of the ALP/Spark integration."
+        echo "Info: this is a basic check of the ALP/Spark integration. Any given number of iterations is ignored."
         ARGS="--class com.huawei.graphblas.examples.Initialise ${CDIR}/build/examples.jar"
         ;;
 # Example 2: run PageRank in pure Spark implementation
@@ -89,7 +89,7 @@ case "${example_num}" in
         echo "Info: this is a true PageRank using ALP/Spark which runs to convergence. Any given number of iterations is ignored."
         ARGS="--class com.huawei.graphblas.examples.Pagerank ${CDIR}/build/examples.jar ${dataset}"
         ;;
-# Example 4: run GraphX Pagerank, uncorrected
+# Example 4: run GraphX Pagerank, Pregel-variant (PageRank-like), un-normalised
     4)
         if [[ ! -z "${persistence}" && ! -z "${dataset}" ]]; then
             run="yes"
