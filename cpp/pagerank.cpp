@@ -27,6 +27,7 @@
 
 #include "pagerank.hpp"
 
+
 constexpr unsigned outer_iters = 5;
 using duration_t = std::chrono::time_point<std::chrono::high_resolution_clock>::duration;
 static duration_t pr_time = duration_t::zero();
@@ -55,15 +56,17 @@ unsigned long get_pr_time() {
  * @param[out] data_out The output pagerank vector.
  */
 void grb_pagerank( const GrB_Input &data_in, GrB_Output &out ) {
+#ifndef NDEBUG
 	const size_t s = grb::spmd<>::pid();
 	const size_t P = grb::spmd<>::nprocs();
-	const size_t omP = grb::config::OMP::threads();
 	assert( s < P );
+#endif
 	out.error_code = grb::PANIC;
 	out.iterations = std::numeric_limits< size_t >::max();
 	out.residual = std::numeric_limits< double >::infinity();
 	out.pinnedVector = nullptr;
 #ifdef FILE_LOGGING
+	const size_t omP = grb::config::OMP::threads();
 	std::string fp = getenv("HOME");
 	fp += "/graphblastest.txt";
 	FILE * file = fopen( fp.c_str(), "a" );
@@ -101,16 +104,16 @@ void grb_pagerank( const GrB_Input &data_in, GrB_Output &out ) {
 #endif
 			return;
 		}
-// 		if( grb::nnz( L ) != parser.nz() ) {
-// #ifdef FILE_LOGGING
-// 			(void) fprintf( file,
-// 				"Number of nonzeroes in grb::Matrix (%zd) does not match that in "
-// 				"file (%zd)!\n",
-// 				grb::nnz( L ), parser.nz() );
-// #endif
-// 			out.error_code = grb::PANIC;
-// 			return;
-// 		}
+		if( grb::nnz( L ) != parser.nz() ) {
+#ifdef FILE_LOGGING
+			(void) fprintf( file,
+				"Warning: number of nonzeroes in grb::Matrix (%zd) does not match that in "
+				"file (%zd). This could be caused by input matrix symmetry.\n",
+				grb::nnz( L ), parser.nz() );
+#endif
+			out.error_code = grb::PANIC;
+			return;
+		}
 		grb::Vector< double > pr( n ), workspace1( n ), workspace2( n ), workspace3( n );
 #ifdef FILE_LOGGING
 		(void) fprintf( file, "Output vector allocated, now passing to PageRank function\n" );
@@ -149,16 +152,12 @@ void grb_pagerank( const GrB_Input &data_in, GrB_Output &out ) {
 #ifdef FILE_LOGGING
 		(void) fprintf( file, "Call to PageRank successful; " );
 #endif
-		// std::string fn = "/home/ascolari/Projects/ALP-Spark/pr-" + std::to_string(getpid()) + ".log";
-		// std::ofstream myfile(fn);
-		// myfile << "ciao" << std::endl;
-		// myfile << "nonzero " << nnz(pr) << std::endl;
 		out.pinnedVector = new grb::PinnedVector< double >( pr, grb::PARALLEL );
 #ifdef FILE_LOGGING
 		(void) fprintf( file, "iters = %zd, residual = %.10e\n", out.iterations, out.residual );
 		(void) fprintf( file, "returning pinned vector @ %p. It contains %zd elements.\n", out.pinnedVector, out.pinnedVector->nonzeroes() );
 #endif
-	} catch (std::runtime_error e ){
+	} catch( std::runtime_error &e ){
 #ifdef FILE_LOGGING
 		(void) fprintf( file, "Got exception: %s\n", e.what() );
 		(void) fflush( file );
