@@ -39,16 +39,12 @@ object GraphXPageRank {
 		for( i <- 1 to times.size ) {
 			val time: Long = System.nanoTime()
                         var checksum: (Long,Double) = (0,0)
-                        if( corrected ) {
-                          // the below two variants are within stddev distance from one another when run on gyro_m
-                          //val pr = graphXmat.pageRank( 0.0000001, 0.15 )
-                          val pr = org.apache.spark.graphx.lib.PageRank.runUntilConvergence( graphXmat, 0.0000001, 0.15 )
-                          checksum = (pr.vertices.count(), pr.vertices.map( x => x._2 ).max())
-                        } else {
-                          // the below variant does do something quite different
-                          val pr = org.apache.spark.graphx.lib.PageRank.runWithOptions( graphXmat, iters, 0.15, None, corrected )
-                          checksum = (pr.vertices.count(), pr.vertices.map( x => x._2 ).max())
-                        }
+                        // the below two variants are within stddev distance from one another when run on gyro_m
+                        //val pr = graphXmat.pageRank( 0.0000001, 0.15 )
+                        //val pr = org.apache.spark.graphx.lib.PageRank.runUntilConvergence( graphXmat, 0.0000001, 0.15 )
+                        // the below variant does do something quite different
+                        val pr = org.apache.spark.graphx.lib.PageRank.runWithOptions( graphXmat, iters, 0.15, None, corrected )
+                        checksum = (pr.vertices.count(), pr.vertices.map( x => x._2 ).max())
 			val time_taken: Double = (System.nanoTime() - time) / 1000000000.0
 			times(i-1) = time_taken
 			println( s" Experiment $i: $time_taken seconds. Checksum: $checksum" )
