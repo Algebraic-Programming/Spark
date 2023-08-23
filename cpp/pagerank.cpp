@@ -56,7 +56,7 @@ unsigned long get_pr_time() {
  * @param[out] data_out The output pagerank vector.
  */
 void grb_pagerank( const GrB_Input &data_in, GrB_Output &out ) {
-#ifndef NDEBUG
+#if !defined NDEBUG || defined FILE_LOGGING
 	const size_t s = grb::spmd<>::pid();
 	const size_t P = grb::spmd<>::nprocs();
 	assert( s < P );
@@ -66,15 +66,23 @@ void grb_pagerank( const GrB_Input &data_in, GrB_Output &out ) {
 	out.residual = std::numeric_limits< double >::infinity();
 	out.pinnedVector = nullptr;
 #ifdef FILE_LOGGING
-	const size_t omP = grb::config::OMP::threads();
-	std::string fp = getenv("HOME");
-	fp += "/graphblastest.txt";
+	std::string fp = "/tmp/graphblastest.txt";
 	FILE * file = fopen( fp.c_str(), "a" );
-	(void) fprintf( file,
-		"This is process %d. I am BSP process %zd out of %zd. OpenMP uses %zd "
-		"threads.\n",
-		getpid(), s, P, omP );
-	(void) fflush( file );
+	#pragma omp parallel
+	{
+		#pragma omp single
+		{
+			const size_t omP = omp_get_num_threads();
+			const char * envchk = getenv( "OMP_NUM_THREADS" );
+			const char * prefix = "reads ";
+			if( envchk == NULL ) { envchk = "not exist"; prefix = "does "; }
+			(void) fprintf( file,
+				"This is process %d. I am BSP process %zd out of %zd. OpenMP uses %zd "
+				"threads. My OMP_NUM_THREADS %s %s.\n",
+				getpid(), s, P, omP, prefix, envchk );
+			(void) fflush( file );
+		}
+	}
 
 #endif
 	assert( data_in.program == PAGERANK_GRB_IO );
@@ -104,15 +112,24 @@ void grb_pagerank( const GrB_Input &data_in, GrB_Output &out ) {
 #endif
 			return;
 		}
-		if( grb::nnz( L ) != parser.nz() ) {
+		try {
+			if( grb::nnz( L ) != parser.nz() ) {
+#ifdef FILE_LOGGING
+				(void) fprintf( file,
+					"Error: number of nonzeroes in grb::Matrix (%zd) does not match that "
+					"reported by the parser (%zd)\n", grb::nnz( L ), parser.nz()
+				);
+#endif
+				out.error_code = grb::PANIC;
+				return;
+			}
+		} catch( ... ) {
 #ifdef FILE_LOGGING
 			(void) fprintf( file,
-				"Warning: number of nonzeroes in grb::Matrix (%zd) does not match that in "
-				"file (%zd). This could be caused by input matrix symmetry.\n",
-				grb::nnz( L ), parser.nz() );
+				"Warning: exception caught during call involing parser.nz(). Assuming that "
+				"this is cased by input matrix symmetry.\n"
+			);
 #endif
-			out.error_code = grb::PANIC;
-			return;
 		}
 		grb::Vector< double > pr( n ), workspace1( n ), workspace2( n ), workspace3( n );
 #ifdef FILE_LOGGING

@@ -41,7 +41,9 @@ static Persistent * grb_instance = nullptr;
 // const int LPF_MPI_AUTO_INITIALIZE = 0;
 
 JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_execIO( JNIEnv * env, jclass classDef, jlong instance, jint program, jstring filename ) {
-	(void)classDef;
+	(void) classDef;
+	(void) instance;
+
 	const char * const cfn = env->GetStringUTFChars( filename, NULL );
 
 	// parse arguments
@@ -66,10 +68,11 @@ JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_execIO( JNIEnv * env, j
 	// prepare input
 	GrB_Input in;
 	size_t cfn_size = strlen( cfn );
-	if( cfn_size > 1024 ) {
-		cfn_size = 1024;
+	if( cfn_size > 1023 ) {
+		cfn_size = 1023;
 	}
-	strncpy( &( in.data[ 0 ] ), cfn, 1024 );
+	strncpy( &( in.data[ 0 ] ), cfn, 1023 );
+	in.data[ 1023 ] = '\0';
 	in.program = PAGERANK_GRB_IO;
 	env->ReleaseStringUTFChars( filename, cfn );
 
@@ -113,8 +116,8 @@ JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_execIO( JNIEnv * env, j
 }
 
 JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_start( JNIEnv * env, jclass classDef, jstring hostname, jint pid, jint P ) {
-	(void)env;
-	(void)classDef;
+	(void) env;
+	(void) classDef;
 #ifdef FILE_LOGGING
 	FILE * file = fopen( "/tmp/graphblastest.txt", "a" );
 	assert( file != NULL );
@@ -127,7 +130,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_start( JNIEnv * env, jc
 		"hostname string I am passing to bsp_mpi_initialize_over_tcp is %s, and I "
 		"am hardcoded to try port 7177. My LPF ID is %d, and the expected number "
 		"of LPF processes is %d\n",
-		getpid(), hostname_str, pid, P ); // hostname_c );
+		getpid(), hostname_c, pid, P );
 	(void)fflush( file );
 #endif
 	std::string hostname_str = hostname_c;
@@ -156,8 +159,9 @@ JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_start( JNIEnv * env, jc
 }
 
 JNIEXPORT void JNICALL Java_com_huawei_graphblas_Native_end( JNIEnv * env, jclass classDef, jlong data ) {
-	(void)env;
-	(void)classDef;
+	(void) env;
+	(void) classDef;
+	(void) data;
 #ifdef FILE_LOGGING
 	FILE * file = fopen( "/tmp/graphblastest.txt", "a" );
 #endif
@@ -166,14 +170,14 @@ JNIEXPORT void JNICALL Java_com_huawei_graphblas_Native_end( JNIEnv * env, jclas
 	}
 	Persistent * const launcher_p = grb_instance;
 #ifdef FILE_LOGGING
-	(void)fprintf( file, "I am process %d. I am about to delete the launcher at %p... ", getpid(), launcher_p );
-	(void)fflush( file );
+	(void) fprintf( file, "I am process %d. I am about to delete the launcher at %p... ", getpid(), launcher_p );
+	(void) fflush( file );
 #endif
 	assert( launcher_p != NULL );
 	delete launcher_p;
 #ifdef FILE_LOGGING
-	(void)fprintf( file, "done!\n" );
-	(void)fclose( file );
+	(void) fprintf( file, "done!\n" );
+	(void) fclose( file );
 #endif
 }
 
@@ -268,25 +272,31 @@ JNIEXPORT void JNICALL Java_com_huawei_graphblas_Native_destroyMatrix(
 }*/
 
 JNIEXPORT void JNICALL Java_com_huawei_graphblas_Native_destroyVector( JNIEnv * env, jclass classDef, jlong vector ) {
+	(void) env;
+	(void) classDef;
+
 	grb::PinnedVector< double > * pointer = reinterpret_cast< grb::PinnedVector< double > * >( vector );
 #ifdef FILE_LOGGING
 	FILE * file = fopen( "/tmp/graphblastest.txt", "a" );
-	(void)fprintf( file, "About to delete the PinnedVector at %p...", pointer );
-	(void)fflush( file );
+	(void) fprintf( file, "About to delete the PinnedVector at %p...", pointer );
+	(void) fflush( file );
 #endif
 	delete pointer;
 #ifdef FILE_LOGGING
-	(void)fprintf( file, "done!\n" );
-	(void)fclose( file );
+	(void) fprintf( file, "done!\n" );
+	(void) fclose( file );
 #endif
 }
 
 JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_argmax( JNIEnv * env, jclass classDef, jlong vector ) {
+	(void) env;
+	(void) classDef;
+
 	grb::PinnedVector< double > * pointer = reinterpret_cast< grb::PinnedVector< double > * >( vector );
 #ifdef FILE_LOGGING
 	FILE * file = fopen( "/tmp/graphblastest.txt", "a" );
-	(void)fprintf( file, "Argmax called on the PinnedVector at %p...", pointer );
-	(void)fflush( file );
+	(void) fprintf( file, "Argmax called on the PinnedVector at %p...", pointer );
+	(void) fflush( file );
 #endif
 	const size_t nnz = pointer->nonzeroes();
 	// sleep(120);
@@ -309,13 +319,16 @@ JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_argmax( JNIEnv * env, j
 		}
 	}
 #ifdef FILE_LOGGING
-	(void)fprintf( file, "returning %zd.\n", curmaxi );
-	(void)fclose( file );
+	(void) fprintf( file, "returning %zd.\n", curmaxi );
+	(void) fclose( file );
 #endif
 	return static_cast< jlong >( curmaxi );
 }
 
 JNIEXPORT jdouble JNICALL Java_com_huawei_graphblas_Native_getValue( JNIEnv * env, jclass classDef, jlong vector, jlong index ) {
+	(void) env;
+	(void) classDef;
+
 	grb::PinnedVector< double > * pointer = reinterpret_cast< grb::PinnedVector< double > * >( vector );
 #ifdef FILE_LOGGING
 	FILE * file = fopen( "/tmp/graphblastest.txt", "a" );
@@ -328,7 +341,8 @@ JNIEXPORT jdouble JNICALL Java_com_huawei_graphblas_Native_getValue( JNIEnv * en
 	double ret = 0;
 	bool found = false;
 	for( size_t i = 0; i < pointer->nonzeroes(); ++i ) {
-		if( pointer->getNonzeroIndex( i ) == index ) {
+		assert( pointer->getNonzeroIndex <= std::numeric_limits< jlong >::max() );
+		if( pointer->getNonzeroIndex( i ) == static_cast< size_t >(index) ) {
 			ret = pointer->getNonzeroValue( i );
 			found = true;
 			break;
@@ -353,7 +367,9 @@ static std::atomic_bool already_initialized(false);
 // static std::mutex sequence_mutex;
 
 JNIEXPORT jboolean JNICALL Java_com_huawei_graphblas_Native_enterSequence(
-	JNIEnv * env, jclass classDef ) {
+	JNIEnv * env, jclass classDef
+) {
+	(void) env; (void) classDef;
 
 	/*
 	const unsigned max_num_threads = static_cast<unsigned>( maxNumThreads );
@@ -386,8 +402,12 @@ JNIEXPORT jboolean JNICALL Java_com_huawei_graphblas_Native_enterSequence(
 }
 
 JNIEXPORT void JNICALL Java_com_huawei_graphblas_Native_exitSequence(
-	JNIEnv * env, jclass classDef ) {
-	already_initialized.store(false);
+	JNIEnv * env, jclass classDef
+) {
+	(void) env;
+	(void) classDef;
+
+	already_initialized.store( false );
 }
 
 JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_getIterations(JNIEnv *, jclass) {
