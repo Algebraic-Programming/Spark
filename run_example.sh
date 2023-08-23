@@ -97,7 +97,7 @@ case "${example_num}" in
         fi
         ARGS="--class com.huawei.graphblas.examples.GraphXPageRank ${CDIR}/build/examples.jar ${persistence} ${iterations} false ${dataset}"
         ;;
-# Example 5: run GraphX Pagerank, corrected (to be confirmed with GraphX source)
+# Example 5: run GraphX Pagerank, normalised (still the Pregel variant)
     5)
         if [[ ! -z "${persistence}" && ! -z "${dataset}" ]]; then
             run="yes"
