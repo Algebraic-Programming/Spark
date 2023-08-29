@@ -53,7 +53,8 @@ public class Native implements Serializable {
 	 *
 	 * @returns An instance pointer used to start GraphBLAS programs.
 	 */
-	public static long begin( String master, int s, int P ) throws Exception {
+	public static long begin( String master, int s, int P, int threads ) throws Exception {
+		System.out.println("number of processes: " + Runtime.getRuntime().availableProcessors() );
 		// FileWriter myWriter = new FileWriter("/home/ascolari/Projects/ALP-Spark/native-" + s + ".log");
 		// myWriter.write("P is: " + P);
 		// myWriter.write("\n");
@@ -80,7 +81,7 @@ public class Native implements Serializable {
 		// }
 		// return ready;
 		boolean isMain = Native.enterSequence();
-		return isMain ? Native.start( master, s, P ) : 0L;
+		return isMain ? Native.start( master, s, P, threads ) : 0L;
 		// if(isMain) {
 		// 	if( s == 0 ){
 		// 		FileWriter myWriter = new FileWriter("/home/ascolari/Projects/ALP-Spark/server-" + s + ".log");
@@ -109,7 +110,7 @@ public class Native implements Serializable {
 	}
 
 	/** @see #begin -- this implements the native part of its functionality. */
-	private static native long start( String master, int s, int P );
+	private static native long start( String master, int s, int P, int threads );
 
 	/**
 	 * Finalises the current GraphBLAS context.

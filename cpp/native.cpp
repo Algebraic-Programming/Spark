@@ -31,6 +31,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <stdexcept>
+#include <cstdio>
 
 #include <sys/types.h>
 #include <fstream>
@@ -115,13 +116,16 @@ JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_execIO( JNIEnv * env, j
 	return reinterpret_cast< long >( out.pinnedVector );
 }
 
-JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_start( JNIEnv * env, jclass classDef, jstring hostname, jint pid, jint P ) {
+JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_start( JNIEnv * env, jclass classDef, jstring hostname, jint pid, jint P, jint threads ) {
 	(void) env;
 	(void) classDef;
 #ifdef FILE_LOGGING
 	FILE * file = fopen( "/tmp/graphblastest.txt", "a" );
 	assert( file != NULL );
 #endif
+	char num_threads_env_var[ 16 ];
+	sprintf( num_threads_env_var, "%d", (int)threads );
+	setenv( "OMP_NUM_THREADS", num_threads_env_var, 1 ); // workaround to tell OMP the number of threads from Spark
 	const char * const hostname_c = env->GetStringUTFChars( hostname, NULL );
 	assert( hostname_c != NULL );
 #ifdef FILE_LOGGING

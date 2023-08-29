@@ -75,7 +75,6 @@ lpf_java_launcher:
 	@mkdir -p lpf_java_launcher/bin
 	@echo '#!/bin/bash' > lpf_java_launcher/bin/java
 	@echo >> lpf_java_launcher/bin/java
-	@echo 'unset OMP_NUM_THREADS' >> lpf_java_launcher/bin/java
 	@echo '$(LPF_INSTALL_PATH)/bin/lpfrun -np 1 -engine $(LPF_ENGINE) $(shell which $(JAVA)) $$@' >> lpf_java_launcher/bin/java
 	@chmod +x lpf_java_launcher/bin/java
 

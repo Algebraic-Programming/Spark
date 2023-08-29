@@ -37,7 +37,10 @@ class GraphBLAS( val sc: SparkContext ) extends AutoCloseable {
 	GraphBLAS.markConstructed( this )
 	var initialized: Boolean = true
 	val (unique_hostnames, nprocs ) = GraphBLAS.getUniqueHostnames( sc )
-	val bcmap: Broadcast[ PIDMapper ] = sc.broadcast( GraphBLAS.getPIDMapper(sc, nprocs, unique_hostnames ))
+	val bcmap: Broadcast[ PIDMapper ] = sc.broadcast( GraphBLAS.getPIDMapper(sc, nprocs, sc.parallelize( 0 until nprocs ).map{ pid => {Utils.getHostnameUnique() } }.collect().toArray ))
+	unique_hostnames.foreach( h => {
+		println( s"-> hostname $h, threads ${bcmap.value.numThreads(h)}" )
+	} )
 	println( s"I detected ${bcmap.value.numProcesses} hosts." )
 	println( s"I elected ${bcmap.value.headnode} as head node." )
 	val distributed_rdd = sc.parallelize( 0 until nprocs )
@@ -47,7 +50,8 @@ class GraphBLAS( val sc: SparkContext ) extends AutoCloseable {
 			node => {
 				val hostname: String = Utils.getHostnameUnique();
 				val s: Int = bcm.value.processID( hostname );
-				(s, Native.begin(bcm.value.headnode, s, bcm.value.numProcesses));
+				val threads: Int = bcm.value.numThreads( hostname )
+				(s, Native.begin(bcm.value.headnode, s, bcm.value.numProcesses, threads ));
 			}
 		}
 		.filter( x => x._2 != 0 ).collect().toArray
