@@ -22,6 +22,8 @@ import java.lang.AutoCloseable
 import scala.Option
 import scala.Some
 
+import org.apache.spark.SparkEnv
+
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.broadcast.Broadcast
@@ -59,7 +61,7 @@ class GraphBLAS( val sc: SparkContext ) extends AutoCloseable {
 	terminateSequence()
 	println("collected results:")
 	instances.foreach( n => {
-		println( s"host ${n._1} address: ${n._2}" )
+		println( s"host ${n._1} address: ${n._2.toHexString}" )
 	})
 	val bc_instances: Broadcast[ Array[( Int, Long ) ] ] = sc.broadcast( instances )
 
@@ -71,37 +73,44 @@ class GraphBLAS( val sc: SparkContext ) extends AutoCloseable {
 	//* GraphBLAS library functions *
 	//*******************************
 
-	private def terminateSequence(): Unit = {
-		val terminated_count = distributed_rdd.map {
+	private def terminateSequence( log: Boolean = false ): Unit = {
+		val rdd = distributed_rdd.map {
 			node => {
+				// if( log ) {
+				println( "terminating..." )
+				// }
 				Native.exitSequence();
 				node
 			}
-		}.count()
-		println( s"terminated $terminated_count nodes" )
+		}
+		val terminated_count = rdd.count()
+		println( s"terminated ${terminated_count} nodes" )
 	}
 
 	private def logMessage( msg: String ): Unit = {
 		println( msg )
 	}
 
-	private def runDistributed[ OutT : ClassTag ]( fun: ( Broadcast[PIDMapper], Int, Boolean ) => OutT ): RDD[ OutT ] = {
+	private def runDistributed[ OutT : ClassTag ]( fun: ( Broadcast[PIDMapper], Int, Boolean ) => OutT, log: Boolean = false ): Array[ OutT ] = {
 		val bcm = bcmap
-		val ret: RDD[ OutT ] = distributed_rdd.map {
+		val ret1: RDD[ (Int, OutT ) ] = distributed_rdd.map {
 			pid => {
 				val hostname: String = Utils.getHostnameUnique();
 				val s: Int = bcm.value.processID( hostname );
 				val canEnter = Native.enterSequence()
-				fun( bcm, s, canEnter )
+				if( canEnter ) {
+					println( s"--------->>>>>>>>> hostname is ${hostname}" )
+				}
+				( if (canEnter) 1 else 0, fun( bcm, s, canEnter ) )
 			}
 		}
-		val c = ret.count()
-		if( c == 0) {
-			throw new Exception( "count is 0!" )
-		}
-		// .barrier()
-		terminateSequence()
-		ret
+
+		val arr = ret1.collect()
+
+		val entered = arr.map( x => x._1 ).reduce( ( a, b ) => { a + b } )
+		println( s"--------->>>>>>>>> entered is ${entered}" )
+		terminateSequence( log )
+		arr.map( x => x._2 )
 	}
 
 	/**
@@ -145,22 +154,20 @@ class GraphBLAS( val sc: SparkContext ) extends AutoCloseable {
 	def pagerank( filename: String ) : Map[Int, Long] = {
 		// val bcm = bcmap
 		val bci = bc_instances
-		val fn = sc.broadcast( filename );
 		val fun = ( bcmap: Broadcast[PIDMapper], s: Int, isMain: Boolean ) => {
 			val ret = if( isMain ) {
 				val pointer_array: Array[(Int,Long)] = bci.value.filter( _._1 == s )
 				assert( pointer_array.size == 1 )
+				println(s"------->>>>>>>> s = ${s} entered")
 				Native.execIO( pointer_array(0)._2, Native.PAGERANK_GRB_IO, filename )
 			} else 0L
 			(s, ret)
 		}
-		val rdd_out = runDistributed( fun ).filter( x => x._2 != 0L )
-		val arr = rdd_out.collect()
+		val arr = runDistributed( fun, true ).filter( x => x._2 != 0L )
 		logMessage( "Collected data instances per node:" )
 		arr.foreach( l => {
-			logMessage( s"node ${l._1} value ${l._2}" )
+			logMessage( s"node ${l._1} value ${l._2.toHexString}" )
 		})
-		terminateSequence()
 		arr.toMap
 	}
 
@@ -182,11 +189,12 @@ class GraphBLAS( val sc: SparkContext ) extends AutoCloseable {
 				(index, value)
 			} else (-1L, 0.0)
 		}
-		val rdd_out = runDistributed( fun ).filter( x => x._1 != -1L )
-		val ret: (Long, Double) = rdd_out.max()( new Ordering[Tuple2[Long,Double]]() {
-			override def compare( x: (Long,Double), y: (Long,Double)): Int =
-				Ordering[Double].compare(x._2, y._2)
-		} )
+		val out = runDistributed( fun ).filter( x => x._1 != -1L )
+		val init = out(0)
+		val ret: (Long, Double) = out.foldLeft( init )( (x: (Long, Double), y: (Long, Double) ) => {
+				if( x._2 > y._2 ) { x } else { y }
+			}
+		)
 		ret
 	}
 
@@ -199,8 +207,7 @@ class GraphBLAS( val sc: SparkContext ) extends AutoCloseable {
 				(s, iters, outer, time)
 			} else (s, 0L, 0L, 0L)
 		}
-		val rdd_out = runDistributed( fun ).filter( x => x._1 == 0 && x._2 != 0 )
-		val arr: Array[(Int, Long, Long, Long)] = rdd_out.collect()
+		val arr: Array[(Int, Long, Long, Long)] = runDistributed( fun ).filter( x => x._1 == 0 && x._2 != 0 )
 		assert( arr.length == 1 )
 		( arr( 0 )._2, arr( 0 )._3, arr( 0 )._4 )
 	}
