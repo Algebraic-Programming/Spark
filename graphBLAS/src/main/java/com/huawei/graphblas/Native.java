@@ -52,7 +52,10 @@ public class Native implements Serializable {
 	public static long begin( String master, int s, int P, int threads ) throws Exception {
 		System.out.println("number of processes: " + Runtime.getRuntime().availableProcessors() );
 		boolean isMain = Native.enterSequence();
-		return isMain ? Native.start( master, s, P, threads ) : 0L;
+		if( isMain ) {
+			System.out.println("initialization for node " + s );
+			return Native.start( master, s, P, threads );
+		} else return 0L;
 	}
 
 	/** @see #begin -- this implements the native part of its functionality. */
@@ -74,7 +77,7 @@ public class Native implements Serializable {
 
 	/**
 	 * Instructs the GraphBLAS to create a matrix from an input MatrixMarket file.
-	 * 
+	 *
 	 *
 	 * \warning The file path must be available on each node this code executes on.
 	 *          Use input via RDDs if you cannot guarantee this.
@@ -149,7 +152,7 @@ public class Native implements Serializable {
 	/**
 	 * Runs a given algorithm on a given matrix file and returns a handle to its
 	 * output vector.
-	 * 
+	 *
 	 * Supported algorithms are:
 	 *  -# PAGERANK_GRB_IO
 	 *
