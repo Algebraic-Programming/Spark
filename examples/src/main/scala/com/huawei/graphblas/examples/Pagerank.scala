@@ -58,7 +58,7 @@ object Pagerank {
 			println( s"cannot access file ${args(0)}, or is a directory" )
 			return
 		}
-		val filePath = infile.getAbsolutePath()
+		val filePath = infile.getCanonicalPath()
 		println( s"reading from file ${filePath}" )
 
 
