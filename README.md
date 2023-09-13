@@ -42,10 +42,8 @@ with the hybrid backend is ongoing.
 # Prerequisites
 
 ## LPF
-You should install a modified LPF version with a few fixes (under integration in
-the main branch) to better support the integration with Apache Spark; this
-version can be found in the `spark_fixes` branch.
-LPF, in turn, requires an MPI installation to be available.
+LPF is the communication layer ALP build atop for the sparse backends.
+It requires an MPI installation to be available.
 Theoretically all MPI implementations should work properly; however, OpenMPI
 does not currently work in practice due to a pending bug (at the time of
 writing - see OpenMPI's
@@ -60,7 +58,7 @@ You may compile it with the usual CMake workflow, optionally specifying several
 LPF-related options
 
 ```bash
-git clone https://github.com/Algebraic-Programming/LPF.git -b spark_fixes
+git clone https://github.com/Algebraic-Programming/LPF.git
 cd LPF
 mkdir build
 export LPF_INSTALL_PATH=$(pwd)/install
