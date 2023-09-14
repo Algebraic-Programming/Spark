@@ -48,16 +48,8 @@ object Initialise {
 
 		val sc = new SparkContext( conf );
 
-		// val P = args(0).toInt;
-		// println( s"Using P = $P." );
 		val t0 = System.nanoTime();
-		// val hostnames = sc.parallelize( 0 until 1 ).map{ pid => {(SparkEnv.get.executorId, Utils.getHostnameUnique())} }.collect().toArray
-		// println("Manual hostnames gathering at start of example:")
-		// println(hostnames.map(t => t._2).flatten)
-		// hostnames.foreach( c => {
-		// 		println("--> exec ID " + c._1 + ", hostname " + c._2 )
-		// 	}
-		// )
+
 
 		println("Now creating GraphBLAS launcher:")
 		Using( new GraphBLAS( sc ) ) { grb => {

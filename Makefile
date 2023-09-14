@@ -84,8 +84,6 @@ emit_config:
 	@echo
 	@echo "# extra paths for libraries"
 	@echo "spark.executor.extraLibraryPath $(GRB_INSTALL_PATH)/lib:$(GRB_INSTALL_PATH)/lib/hybrid:$(shell pwd)/build"
-	@echo "# do not init LPF automatically"
-	@echo "spark.executorEnv.LPF_INIT NO"
 	@echo "# use the LPF-Java wrapper"
 	@echo "spark.executorEnv.JAVA_HOME $(shell pwd)/lpf_java_launcher"
 	@echo

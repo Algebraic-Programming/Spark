@@ -47,14 +47,10 @@ object Pagerank {
 		}
 		val conf = new SparkConf().setAppName( "Spark GraphBLAS Pagerank" )
 		val sc = new SparkContext( conf );
-		println( "--> default parallelism: " + sc. defaultParallelism )
 
-
-		// val P = args(0).toInt;
-		// println( s"Using P = $P." )
 		val t0 = System.nanoTime()
 		val infile: File = new File( args(0) );
-		if( !infile.exists() || infile.isDirectory()) { 
+		if( !infile.exists() || infile.isDirectory()) {
 			println( s"cannot access file ${args(0)}, or is a directory" )
 			return
 		}

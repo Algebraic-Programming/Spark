@@ -21,9 +21,9 @@ import java.lang.Exception
 import java.lang.AutoCloseable
 import scala.Option
 import scala.Some
+import scala.reflect.ClassTag
 
 import org.apache.spark.SparkEnv
-
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.broadcast.Broadcast
@@ -31,7 +31,7 @@ import org.apache.spark.broadcast.Broadcast
 import com.huawei.Utils
 import com.huawei.graphblas.Native
 import com.huawei.graphblas.PIDMapper
-import scala.reflect.ClassTag
+import com.huawei.CyclicPartitioner
 
 // @SerialVersionUID(121L)
 class GraphBLAS( val sc: SparkContext ) extends AutoCloseable {
@@ -39,13 +39,17 @@ class GraphBLAS( val sc: SparkContext ) extends AutoCloseable {
 	GraphBLAS.markConstructed( this )
 	var initialized: Boolean = true
 	val (unique_hostnames, nprocs ) = GraphBLAS.getUniqueHostnames( sc )
-	val bcmap: Broadcast[ PIDMapper ] = sc.broadcast( GraphBLAS.getPIDMapper(sc, nprocs, sc.parallelize( 0 until nprocs ).map{ pid => {Utils.getHostnameUnique() } }.collect().toArray ))
+	val distributed_rdd = sc.parallelize( 0 until nprocs ).map( id => (id,id) )
+		.partitionBy( new CyclicPartitioner( nprocs ) )
+	val bcmap: Broadcast[ PIDMapper ] = sc.broadcast(
+			GraphBLAS.getPIDMapper(sc, nprocs, distributed_rdd
+				.map{ pid => {Utils.getHostnameUnique() } }.collect().toArray ))
 	unique_hostnames.foreach( h => {
-		println( s"-> hostname $h, threads ${bcmap.value.numThreads(h)}" )
+		println( s"-> executor ${h}, threads ${bcmap.value.numThreads(h)}" )
 	} )
 	println( s"I detected ${bcmap.value.numProcesses} hosts." )
 	println( s"I elected ${bcmap.value.headnode} as head node." )
-	val distributed_rdd = sc.parallelize( 0 until nprocs )
+
 	val instances: Array[ ( Int, Long ) ] =  {
 		val bcm = bcmap
 		distributed_rdd.map {
@@ -445,6 +449,7 @@ object GraphBLAS {
 	def getParallelism( sc: SparkContext ): Int = {
 		println( "--> default parallelism first: " + sc.defaultParallelism )
 		val seed = sc.parallelize( List(0, 1) ).map{ pid => {Utils.getHostnameUnique() } }.collect().toArray
+		assert( seed.length == 2 )
 		println( "--> default parallelism after: " + sc.defaultParallelism )
 		sc.defaultParallelism
 	}
@@ -452,22 +457,11 @@ object GraphBLAS {
 
 	def getUniqueHostnames( sc: SparkContext ) : ( Array[String], Int ) = {
 		val parallelism = getParallelism( sc )
-		val hostnames_prior = sc.parallelize( 0 until parallelism ).map{ pid => {Utils.getHostnameUnique() } }.collect().toArray
-		// hostnames_prior.foreach( { s =>
-		// 	println( s"hostname is: $s" )
-		// } )
-		// println("keys")
-		// val hosts = sc. statusTracker.getExecutorInfos.map( i => i.host )
-		// println(hosts.toList)
+		val hostnames = sc.parallelize( 0 until parallelism ).map{ pid => {Utils.getHostnameUnique() } }.collect().toArray
 
-		// val hostnames = sc.parallelize( hosts.toSeq ).map{ pid => {Utils.getHostnameUnique() } }.collect().toArray
-		// println( "--> default parallelism 3: " + sc. defaultParallelism )
-
-		// println( "--->>> hostnames:")
-		// println( hostnames.toList )
-		val unique_hostnames = hostnames_prior.distinct
+		val unique_hostnames = hostnames.distinct
 		scala.util.Sorting.quickSort(unique_hostnames)
-		println( "--->>> distinct hostnames:")
+		println( "--->>> distinct executor identifiers:")
 		println( unique_hostnames.toList )
 		// unique_hostnames
 		( unique_hostnames, parallelism )

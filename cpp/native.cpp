@@ -38,8 +38,8 @@
 
 static Persistent * grb_instance = nullptr;
 
-/** LPF is not responsible for process management. */
-// const int LPF_MPI_AUTO_INITIALIZE = 0;
+// do not initialize MPI when loading the library
+const int LPF_MPI_AUTO_INITIALIZE = 0;
 
 JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_execIO( JNIEnv * env, jclass classDef, jlong instance, jint program, jstring filename ) {
 	(void) classDef;
@@ -139,20 +139,8 @@ JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_start( JNIEnv * env, jc
 #endif
 	std::string hostname_str = hostname_c;
 	env->ReleaseStringUTFChars( hostname, hostname_c );
-	// std::string fn = "/home/ascolari/Projects/ALP-Spark/app-" + std::to_string(pid) + ".log";
-	// std::ofstream myfile(fn);
-	// myfile << "hostname is " << hostname_str << std::endl;
-	// myfile << "PID is " << getpid() << std::endl;
-	// myfile << "ID is " << pid << " out of " << P << std::endl;
-	// myfile << "connecting to " << hostname_str << std::endl;
 	Persistent * const ret = new Persistent( pid, P, hostname_str, "7177", false );
 	grb_instance = ret;
-	// myfile << "connected to " << hostname_str << std::endl;
-	int world_size, flag;
-	MPI_Comm_size(MPI_COMM_WORLD, &world_size);
-	// myfile << "seeing " << world_size << std::endl;
-	MPI_Initialized( &flag );
-	// myfile << "MPI is inited: " << ( flag ? "TRUE" : "FALSE" ) << std::endl;
 	assert( ret != NULL );
 #ifdef FILE_LOGGING
 	// do some logging
@@ -374,32 +362,6 @@ JNIEXPORT jboolean JNICALL Java_com_huawei_graphblas_Native_enterSequence(
 	JNIEnv * env, jclass classDef
 ) {
 	(void) env; (void) classDef;
-
-	/*
-	const unsigned max_num_threads = static_cast<unsigned>( maxNumThreads );
-	unsigned num_threads;
-	std::unique_lock< std::mutex > lk( counter_mutex );
-	num_threads = ++counter;
-	local_counter = num_threads;
-	if( num_threads > maxNumThreads ) {
-		return num_threads; // we have more elements than threads
-	}
-	pid_t tid = gettid();
-	std::string fn = "/home/ascolari/Projects/ALP-Spark/thread-" + std::to_string(tid) + ".log";
-	std::ofstream myfile(fn, std::ios_base::app);
-	myfile << "got threads: " << max_num_threads << std::endl;
-	myfile << "counter: " << num_threads << std::endl;
-	if( num_threads == max_num_threads ) {
-		lk.unlock();
-		cv.notify_all();
-	} else {
-		cv.wait( lk, [ max_num_threads] {
-			return counter.load() == max_num_threads;
-		} );
-	}
-	return static_cast< jint >( num_threads );
-	*/
-
 	bool f = false;
 	const bool initializer = already_initialized.compare_exchange_strong( f, true );
 	return static_cast< jboolean >( initializer );
