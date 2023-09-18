@@ -17,9 +17,9 @@
 
 include config.conf
 
-.PHONY: all clean install jars cpp_clean emit_config
+.PHONY: all clean install package_jars cpp_clean emit_config
 
-all: cpp_lib jars lpf_java_launcher emit_config
+all: cpp_lib package_jars lpf_java_launcher emit_config
 
 GRBCXX=$(GRB_INSTALL_PATH)/bin/grbcxx
 
@@ -37,9 +37,11 @@ ${GRB_INSTALL_PATH}/lib/spark/%: build/%
 	mkdir -p ${GRB_INSTALL_PATH}/lib/spark || true
 	cp "$<" "$@"
 
-jars:
+package_jars:
 	sbt package
 
+assemble_jars:
+	sbt assembly
 
 build/com_huawei_graphblas_Native.h: graphBLAS/src/main/java/com/huawei/graphblas/Native.java graphBLAS/src/main/java/com/huawei/graphblas/Loader.java
 	mkdir build || true
