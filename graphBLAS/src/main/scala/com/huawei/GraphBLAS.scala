@@ -95,7 +95,11 @@ class GraphBLAS( val sc: SparkContext ) extends AutoCloseable {
 		println( msg )
 	}
 
-	private def runDistributed[ OutT : ClassTag ]( fun: ( Broadcast[PIDMapper], Int, Boolean ) => OutT, log: Boolean = false ): Array[ OutT ] = {
+	private def runDistributed[ OutT : ClassTag ](
+		fun: (Broadcast[PIDMapper], Int, Boolean ) => OutT,
+		filter: Option[ OutT => Boolean ],
+		log: Boolean
+	): Array[ OutT ] = {
 		val bcm = bcmap
 		val ret1: RDD[ (Int, OutT ) ] = distributed_rdd.map {
 			pid => {
@@ -107,15 +111,31 @@ class GraphBLAS( val sc: SparkContext ) extends AutoCloseable {
 				}
 				( if (canEnter) 1 else 0, fun( bcm, s, canEnter ) )
 			}
+		}.persist()
+
+		if( log ) {
+			val entered = ret1.map( x => x._1 ).reduce( ( a, b ) => { a + b } )
+			println( s"--------->>>>>>>>> entered is ${entered}" )
 		}
 
-		val arr = ret1.collect()
+		val user_vals = ret1.map( x => x._2 )
 
-		val entered = arr.map( x => x._1 ).reduce( ( a, b ) => { a + b } )
-		println( s"--------->>>>>>>>> entered is ${entered}" )
+		val arr: Array[ OutT ] = ( if( filter.isDefined ) { user_vals.filter( filter.get ) } else user_vals ).collect()
+		ret1.unpersist()
+
 		terminateSequence( log )
-		arr.map( x => x._2 )
+		arr
 	}
+
+	private def runDistributed[ OutT : ClassTag ](
+		fun: ( Broadcast[PIDMapper], Int, Boolean ) => OutT,
+		filter: OutT => Boolean,
+		log: Boolean = false
+	): Array[ OutT ] = runDistributed[ OutT ]( fun, Option( filter ), log )
+
+	private def runDistributed[ OutT : ClassTag  ](
+		fun: (Broadcast[PIDMapper], Int, Boolean ) => OutT
+	): Array[ OutT ] = runDistributed[ OutT ](fun, Option.empty[ OutT => Boolean ], false )
 
 	/**
 	 * Frees any underlying GraphBLAS resources.
@@ -167,7 +187,7 @@ class GraphBLAS( val sc: SparkContext ) extends AutoCloseable {
 			} else 0L
 			(s, ret)
 		}
-		val arr = runDistributed( fun, true ).filter( x => x._2 != 0L )
+		val arr = runDistributed( fun, ( x: (Int, Long) ) => x._2 != 0L, true )
 		logMessage( "Collected data instances per node:" )
 		arr.foreach( l => {
 			logMessage( s"node ${l._1} value ${l._2.toHexString}" )
@@ -193,7 +213,7 @@ class GraphBLAS( val sc: SparkContext ) extends AutoCloseable {
 				(index, value)
 			} else (-1L, 0.0)
 		}
-		val out = runDistributed( fun ).filter( x => x._1 != -1L )
+		val out = runDistributed( fun, ( x: (Long, Double ) ) => x._1 != -1L )
 		val init = out(0)
 		val ret: (Long, Double) = out.foldLeft( init )( (x: (Long, Double), y: (Long, Double) ) => {
 				if( x._2 > y._2 ) { x } else { y }
@@ -211,7 +231,9 @@ class GraphBLAS( val sc: SparkContext ) extends AutoCloseable {
 				(s, iters, outer, time)
 			} else (s, 0L, 0L, 0L)
 		}
-		val arr: Array[(Int, Long, Long, Long)] = runDistributed( fun ).filter( x => x._1 == 0 && x._2 != 0 )
+		val arr: Array[(Int, Long, Long, Long)] = runDistributed( fun,
+			( x: (Int, Long, Long, Long ) ) => { x._1 == 0 && x._2 != 0 }
+		)
 		assert( arr.length == 1 )
 		( arr( 0 )._2, arr( 0 )._3, arr( 0 )._4 )
 	}
@@ -240,7 +262,7 @@ class GraphBLAS( val sc: SparkContext ) extends AutoCloseable {
 	 *
 	 * @returns A GraphBLAS #SparseMatrix.
 	 */
-	/*def createMatrix( sc: org.apache.spark.SparkContext, instance: Instance, rdd: RDD[(Long,Iterable[Long],Iterable[Double])] ): SparseMatrix = {
+	def createMatrix( sc: SparkContext, instance: Instance, rdd: RDD[(Long,Iterable[Long],Iterable[Double])] ): SparseMatrix = {
 		val P: Int = instance._1;
 		val coalesced = rdd.coalesce( P );
 		val actualP: Int = coalesced.partitions.length;
@@ -251,7 +273,7 @@ class GraphBLAS( val sc: SparkContext ) extends AutoCloseable {
 		val matrix_pointers = sc.parallelize( 0 until P ).map {
 			pid => {
 				var init: Long = 0;
-				val hostname = "hostname"!!;
+				val hostname: String = Utils.getHostnameUnique();
 				if( instance._2.value.threadID( hostname ) == 0 ) {
 					val s: Int = instance._2.value.processID( hostname );
 					init = Native.matrixInput( s, P );
@@ -265,7 +287,7 @@ class GraphBLAS( val sc: SparkContext ) extends AutoCloseable {
 		val init_pointers = coalesced.mapPartitionsWithIndex {
 			(pid, iterator) => {
 				var matrix_pointer: Long = 0
-				val hostname = "hostname"!!;
+				val hostname: String = Utils.getHostnameUnique();
 				if( instance._2.value.threadID( hostname ) == 0 ) {
 					val s = instance._2.value.processID( hostname );
 					matrix_pointer = matrix_pointers.filter( x => x._1 == s ).map( x => x._2 ).head;
@@ -295,7 +317,7 @@ class GraphBLAS( val sc: SparkContext ) extends AutoCloseable {
 
 		//done
 		new SparseMatrix( out.collect().toArray );
-	}*/
+	}
 
 	/**
 	 * Creates a randomly generated GraphBLAS sparse matrix.
@@ -444,7 +466,7 @@ object GraphBLAS {
 		}
 	};
 
-	type Instance = ( Array[String], Broadcast[PIDMapper], Array[(Int, Long)] )
+	// type Instance = ( Array[String], Broadcast[PIDMapper], Array[(Int, Long)] )
 
 	def getParallelism( sc: SparkContext ): Int = {
 		println( "--> default parallelism first: " + sc.defaultParallelism )
