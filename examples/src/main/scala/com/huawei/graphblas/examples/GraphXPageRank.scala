@@ -24,35 +24,36 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.SparkConf
 import org.apache.spark.SparkContext
 
-import com.huawei.Utils
+import com.huawei.MatrixMarketReader
 
 object GraphXPageRank {
 
 	def benchmark( sc: SparkContext, file: String, iters: Int, normalized: Boolean ): Unit = {
-                val outerIt: Int = 5
+		val outerIt: Int = 5
 		val times: Array[Double] = new Array[Double]( outerIt )
-                val matrix = Utils.readMM( sc, file )
-                println( "Matrix is " + matrix._1 + " by " + matrix._2 + " and has " + matrix._3 + " nonzeroes." );
-                println( "Checksum (matrix rows): " + matrix._4.count() );
-                val graphXmat = Utils.matrix2GraphX( sc, matrix )
-                println( "GraphX: #edges is " + graphXmat.numEdges + ", #vertices is " + graphXmat.numVertices );
-		for( i <- 1 to times.size ) {
+		val matrix = MatrixMarketReader.readMM( sc, file )
+		matrix.printSummary()
+		val graphXmat = MatrixMarketReader.matrix2GraphX( sc, matrix )
+		println( "GraphX: #edges is " + graphXmat.numEdges + ", #vertices is " + graphXmat.numVertices )
+		var i: Int = 0
+		while( i < times.size ) {
 			val time: Long = System.nanoTime()
-                        var checksum: (Long,Double) = (0,0)
-                        // the below two variants are within stddev distance from one another when run on gyro_m
-                        //val pr = graphXmat.pageRank( 0.0000001, 0.15 )
-                        //val pr = org.apache.spark.graphx.lib.PageRank.runUntilConvergence( graphXmat, 0.0000001, 0.15 )
-                        // the below variant does do something quite different
-                        val pr = org.apache.spark.graphx.lib.PageRank.runWithOptions( graphXmat, iters, 0.15, None, normalized )
-                        checksum = (pr.vertices.count(), pr.vertices.map( x => x._2 ).max())
+			var checksum: (Long,Double) = (0,0)
+			// the below two variants are within stddev distance from one another when run on gyro_m
+			//val pr = graphXmat.pageRank( 0.0000001, 0.15 )
+			//val pr = org.apache.spark.graphx.lib.PageRank.runUntilConvergence( graphXmat, 0.0000001, 0.15 )
+			// the below variant does do something quite different
+			val pr = org.apache.spark.graphx.lib.PageRank.runWithOptions( graphXmat, iters, 0.15, None, normalized )
+			checksum = (pr.vertices.count(), pr.vertices.map( x => x._2 ).max())
 			val time_taken: Double = (System.nanoTime() - time) / 1000000000.0
-			times(i-1) = time_taken
+			times(i) = time_taken
 			println( s" Experiment $i: $time_taken seconds. Checksum: $checksum" )
-                }
+			i += 1
+		}
 		val avg_time: Double = times.sum / times.size
 		val sstddev:  Double = sqrt( times.map( x => (x - avg_time) * (x - avg_time) ).sum / (times.size-1) )
 		println( s"Number of runs: ${times.size}.\nAverage time taken: $avg_time seconds.\nSample standard deviation: $sstddev" )
-        }
+    }
 
 	def main( args: Array[String] ): Unit = {
 		val sconf = new SparkConf().setAppName( "PageRank benchmarks" );
@@ -66,6 +67,6 @@ object GraphXPageRank {
 			println( s"Starting benchmark using $x" );
 			benchmark( sc, x, iters, normalized );
 		} );
-        }
+    }
 }
 

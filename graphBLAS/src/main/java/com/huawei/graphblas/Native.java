@@ -20,6 +20,8 @@ package com.huawei.graphblas;
 
 
 import java.io.Serializable;
+import sun.misc.Unsafe;
+import java.lang.reflect.Field;
 
 
 /** Collects the native interface into the GraphBLAS. */
@@ -88,7 +90,34 @@ public class Native implements Serializable {
 	 *
 	 * @returns A pointer to the new GraphBLAS matrix.
 	 */
-	//public static native long createMatrix( int s, int P, String path );
+	// public static native long createMatrix( int s, int P, String path );
+
+
+
+
+	public static native long addDataSeries( int index, long length );
+
+	public static native void allocateIngestionMemory();
+
+	public static native long getOffset();
+
+	public static native long getIndexBaseAddress( int index );
+
+
+	public static Unsafe getTheUnsafe() {
+		sun.misc.Unsafe unsafe;
+		try {
+			Field unsafeField = Unsafe.class.getDeclaredField("theUnsafe");
+			unsafeField.setAccessible(true);
+			unsafe = (sun.misc.Unsafe) unsafeField.get(null);
+		} catch (Throwable cause) {
+			unsafe = null;
+		}
+		return unsafe;
+	}
+
+	public static native void cleanIngestionData();
+
 
 	/**
 	 * Initialises streaming in a sparse matrix.
@@ -98,7 +127,7 @@ public class Native implements Serializable {
 	 *
 	 * @returns A local pointer to a matrix-under-construction.
 	 */
-	//public static native long matrixInput( int s, int P );
+	// public static native long matrixInput( int s, int P );
 
 	/**
 	 * Adds one row to a matrix under construction.
@@ -108,7 +137,7 @@ public class Native implements Serializable {
 	 * @param[in] col_ind The array of column indices this row has nonzeroes on.
 	 * @param[in] values The array of nonzeroes this row contains.
 	 */
-	//public static native void matrixAddRow( long matrix, long row, long col_ind[] );
+	// public static native void matrixAddRow( long matrix, long row, long col_ind[] );
 
 	/**
 	 * Finalises reading in a sparse matrix.
@@ -119,7 +148,7 @@ public class Native implements Serializable {
 	 *
 	 * @returns A pointer to the finalised GraphBLAS matrix.
 	 */
-	//public static native long matrixDone( long matrixInput );
+	// public static native long matrixDone( long matrixInput );
 
 	/**
 	 * Frees a given matrix.
@@ -128,7 +157,7 @@ public class Native implements Serializable {
 	 *               will no longer be valid to pass to other Native functions.
 	 *
 	 */
-	//public static native void destroyMatrix( long matrix );
+	// public static native void destroyMatrix( long matrix );
 
 	/**
 	 * Frees a given vector.

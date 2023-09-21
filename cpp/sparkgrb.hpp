@@ -39,7 +39,8 @@ typedef grb::Launcher< grb::EXEC_MODE::MANUAL > Persistent;
 typedef struct {
 	size_t m;
 	size_t n;
-	std::pair< std::vector< size_t >, std::vector< size_t > > coordinates;
+	std::vector< size_t > rows;
+	std::vector< size_t > cols;
 } MatrixUnderConstruction;
 
 /** A list of all supported GraphBLAS subroutines / programs. */

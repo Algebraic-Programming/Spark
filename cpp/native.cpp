@@ -32,6 +32,10 @@
 #include <condition_variable>
 #include <stdexcept>
 #include <cstdio>
+#include <unordered_map>
+#include <cstdlib>
+#include <limits>
+#include <malloc.h>
 
 #include <sys/types.h>
 #include <fstream>
@@ -173,38 +177,134 @@ JNIEXPORT void JNICALL Java_com_huawei_graphblas_Native_end( JNIEnv * env, jclas
 #endif
 }
 
-/*JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_createMatrix(
-    JNIEnv * env, jclass classDef,
-    jint pid, jint P,
-    jstring path
+
+
+
+
+
+
+// JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_createMatrix(
+//     JNIEnv * env, jclass classDef,
+//     jint pid, jint P,
+//     jstring path
+// ) {
+//     if( path == NULL ) {
+//         return 0;
+//     }
+//     jsize strlen = env->GetStringLength( path );
+//     if( strlen == 0 ) {
+//         return 0;
+//     }
+//     const char * const cfn = env->GetStringUTFChars( path, NULL );
+//     assert( cfn != NULL );
+//     const std::string fn = cfn;
+//     grb::utils::MatrixFileReader<void> reader = grb::utils::MatrixFileReader<void>( std::string(fn) );
+//     env->ReleaseStringUTFChars( path, cfn );
+//     if( reader.m() == 0 || reader.n() == 0 ) {
+//         return 0;
+//     }
+//     grb::Matrix<void> *ret = new grb::Matrix<void>( reader.m(), reader.n() );
+//     assert( ret != NULL );
+//     const grb::RC rc = grb::buildMatrixUnique( *ret, reader.cbegin(), reader.cend(), SEQUENTIAL );
+//     assert( rc == SUCCESS );
+//     return reinterpret_cast< jlong >(ret);
+// }
+
+
+std::mutex ingestion_mutex;
+
+struct ingestion_data {
+	std::atomic_size_t length;
+	std::unordered_map< int, std::size_t > index_length;
+
+	ingestion_data() : length( 0UL ) {}
+};
+
+struct ingestion_data * ingestion = nullptr;
+
+
+JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_addDataSeries(
+    JNIEnv *, jclass,
+    jint index, jlong length
 ) {
-    if( path == NULL ) {
-        return 0;
-    }
-    jsize strlen = env->GetStringLength( path );
-    if( strlen == 0 ) {
-        return 0;
-    }
-    const char * const cfn = env->GetStringUTFChars( path, NULL );
-    assert( cfn != NULL );
-    const std::string fn = cfn;
-    grb::utils::MatrixFileReader<void> reader = grb::utils::MatrixFileReader<void>( std::string(fn) );
-    env->ReleaseStringUTFChars( path, cfn );
-    if( reader.m() == 0 || reader.n() == 0 ) {
-        return 0;
-    }
-    grb::Matrix<void> *ret = new grb::Matrix<void>( reader.m(), reader.n() );
-    assert( ret != NULL );
-    const grb::RC rc = grb::buildMatrixUnique( *ret, reader.cbegin(), reader.cend(), SEQUENTIAL );
-    assert( rc == SUCCESS );
-    return reinterpret_cast< jlong >(ret);
+	const int id = static_cast< int >( index );
+	const std::size_t len = static_cast< std::size_t >( length );
+
+	std::lock_guard<std::mutex> lock( ingestion_mutex );
+
+	if( ingestion == nullptr ) {
+		ingestion = new ingestion_data;
+	}
+	if( ingestion->index_length.find( id ) != ingestion->index_length.cend() ) {
+		printf( "index %d already present\n", id );
+		return -1;
+	}
+	std::size_t newLength = ingestion->length += len;
+	std::size_t oldLength = newLength - len;
+	printf( "inserting index %d\n", id );
+	ingestion->index_length.emplace( static_cast< int >( id ),
+		oldLength );
+	return static_cast< jlong >( oldLength );
 }
+
+#pragma pack(1)
+struct matrix_entry {
+	std::size_t row;
+	std::size_t col;
+};
+
+struct matrix_entry * entries = nullptr;
+
+
+JNIEXPORT void JNICALL Java_com_huawei_graphblas_Native_allocateIngestionMemory(
+    JNIEnv *, jclass
+) {
+	std::size_t size = ingestion->length * sizeof( matrix_entry );
+	entries = ( matrix_entry * )memalign( sizeof( matrix_entry ), size );
+	printf( "allocating size %lu at address %p\n", size, entries );
+}
+
+JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_getOffset(
+    JNIEnv *, jclass
+) {
+	return static_cast< jlong >( sizeof( std::size_t ) );
+}
+
+
+
+JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_getIndexBaseAddress(
+    JNIEnv *, jclass,
+    jint index
+) {
+	const int id = static_cast< int >( index );
+	typename std::unordered_map< int, std::size_t >::const_iterator el =
+		ingestion->index_length.find( id );
+	if( el == ingestion->index_length.cend() ) {
+		printf( "index %d is absent\n", id );
+		throw std::runtime_error( "index " + std::to_string( index ) + " not present" );
+		// return static_cast< jlong >( std::numeric_limits< long >::max() );
+	}
+	return reinterpret_cast< jlong >( entries + el->second );
+}
+
+JNIEXPORT void JNICALL Java_com_huawei_graphblas_Native_cleanIngestionData(
+    JNIEnv *, jclass
+) {
+	delete ingestion;
+	ingestion = nullptr;
+	free( entries );
+	entries = nullptr;
+}
+
+
+/*
+MatrixUnderConstruction * ret = nullptr;
 
 JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_matrixInput(
     JNIEnv * env, jclass classDef,
     jint nrows, jint ncols
 ) {
-    MatrixUnderConstruction * const ret = new MatrixUnderConstruction();
+    ret = new MatrixUnderConstruction();
     assert( ret != NULL );
     ret->m = nrows;
     ret->n = ncols;
@@ -229,8 +329,8 @@ JNIEXPORT void JNICALL Java_com_huawei_graphblas_Native_matrixAddRow(
     jlong * array = static_cast< jlong* >(env->GetPrimitiveArrayCritical( colind, NULL ));
     assert( array != NULL );
     for( size_t i = 0; i < nonzeroes; ++i ) {
-        matrix.coordinates.first.push_back( row );
-        matrix.coordinates.second.push_back( array[i] );
+        matrix.rows.push_back( row );
+        matrix.cols.push_back( array[i] );
     }
     env->ReleasePrimitiveArrayCritical( colind, array, JNI_ABORT );
     return;
@@ -245,10 +345,10 @@ JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_matrixDone(
     grb::Matrix<void> * const ret = new grb::Matrix<void>( matrix.m, matrix.n );
     assert( ret != NULL );
     auto start = grb::utils::SynchronizedNonzeroIterator< size_t, size_t, void, SubIterator, SubIterator, void >(
-        matrix.coordinates.first.cbegin(), matrix.coordinates.second.cbegin()
+        matrix.rows.cbegin(), matrix.cols.cbegin()
     );
     const auto end = grb::utils::SynchronizedNonzeroIterator< size_t, size_t, void, SubIterator, SubIterator, void >(
-        matrix.coordinates.first.cend(), matrix.coordinates.second.cend()
+        matrix.rows.cend(), matrix.cols.cend()
     );
     const grb::RC rc = grb::buildMatrixUnique( *ret, start, end, PARALLEL );
     assert( rc == SUCCESS );
@@ -261,7 +361,15 @@ JNIEXPORT void JNICALL Java_com_huawei_graphblas_Native_destroyMatrix(
     jlong matrix
 ) {
     delete reinterpret_cast< grb::Matrix<void>* >(matrix);
-}*/
+}
+*/
+
+
+
+
+
+
+
 
 JNIEXPORT void JNICALL Java_com_huawei_graphblas_Native_destroyVector( JNIEnv * env, jclass classDef, jlong vector ) {
 	(void) env;
