@@ -23,7 +23,12 @@ import org.apache.spark.SparkConf
 import org.apache.spark.SparkContext
 import scala.util.Using
 
-import com.huawei.GraphBLAS
+import com.huawei.graphblas.GraphBLAS
+import com.huawei.MatrixMarketReader
+import com.huawei.graphblas.GraphBLASMatrix
+import com.huawei.graphblas.PageRank
+import com.huawei.graphblas.PageRankResult
+
 
 object ReadFile {
 
@@ -45,10 +50,21 @@ object ReadFile {
 
 
 		println("Now creating GraphBLAS launcher:")
-		Using( new GraphBLAS( sc ) ) { grb => {
 
-			val output = grb.createMatrix( filePath )
-		} }
+		val ( iters: Long, outer: Long, time: Long ) =
+		Using.Manager( use => {
+			val grb = use( new GraphBLAS( sc ) )
+			val matrix = MatrixMarketReader.readMM( sc, filePath )
+			println( s"--->>>> number of partitions ${matrix.data.getNumPartitions}" )
+			val grbMat = use(  GraphBLASMatrix.createMatrixFromRDD( grb, matrix, true ) )
+			val results = use( PageRank.runFromMatrix( grbMat ) )
+			val maxpair = results.max()
+			println("maximum PageRank entry:")
+			println(maxpair)
+			grb.getRunStats()
+		} ).get
+		val avgTimeSecs = ( time.toDouble / outer.toDouble ) / 1000000000.0
+		println( s"Iterations: $iters, outer iterations: $outer, time per outer iteration: $avgTimeSecs seconds" )
 	}
 }
 

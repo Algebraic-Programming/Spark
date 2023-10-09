@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.huawei
+package com.huawei.graphblas
 
 import java.lang.Exception
 import java.lang.AutoCloseable
@@ -27,7 +27,6 @@ import org.apache.spark.SparkEnv
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.broadcast.Broadcast
-import org.apache.spark.TaskContext
 
 import com.huawei.Utils
 import com.huawei.CyclicPartitioner
@@ -36,9 +35,8 @@ import com.huawei.RDDSparseMatrix
 
 import com.huawei.graphblas.Native
 import com.huawei.graphblas.PIDMapper
-import com.esotericsoftware.kryo.util.Util
 
-// @SerialVersionUID(121L)
+
 class GraphBLAS( val sc: SparkContext ) extends AutoCloseable {
 
 	GraphBLAS.markConstructed( this )
@@ -100,12 +98,12 @@ class GraphBLAS( val sc: SparkContext ) extends AutoCloseable {
 		println( msg )
 	}
 
-	private def runDistributed[ OutT : ClassTag ](
+	private[graphblas] def runDistributedRdd[ OutT : ClassTag ](
 		fun: ( Int ) => OutT,
 		defValue: OutT,
 		filter: Option[ OutT => Boolean ],
 		log: Boolean
-	): Array[ OutT ] = {
+	): RDD[ OutT ] = {
 		val bcm = bcmap
 		val ret1: RDD[ (Int, OutT ) ] = distributed_rdd.map {
 			pid => {
@@ -118,6 +116,7 @@ class GraphBLAS( val sc: SparkContext ) extends AutoCloseable {
 				( if ( canEnter ) 1 else 0, if ( canEnter ) fun( s ) else defValue )
 			}
 		}.persist()
+		terminateSequence( log )
 
 		if( log ) {
 			val entered = ret1.map( x => x._1 ).reduce( ( a, b ) => { a + b } )
@@ -125,22 +124,40 @@ class GraphBLAS( val sc: SparkContext ) extends AutoCloseable {
 		}
 
 		val user_vals = ret1.map( x => x._2 )
-
-		val arr: Array[ OutT ] = ( if( filter.isDefined ) { user_vals.filter( filter.get ) } else user_vals ).collect()
-		ret1.unpersist()
-
-		terminateSequence( log )
-		arr
+		( if( filter.isDefined ) { user_vals.filter( filter.get ) } else user_vals ).unpersist()
 	}
 
-	private def runDistributed[ OutT : ClassTag ](
+	private[graphblas] def runDistributedRdd[ OutT : ClassTag ](
+		fun: ( Int ) => OutT,
+		defValue: OutT,
+		filter: OutT => Boolean,
+		log: Boolean
+	): RDD[ OutT ] = runDistributedRdd[ OutT ]( fun, defValue, Option( filter ), log )
+
+	private[graphblas] def runDistributedRdd[ OutT : ClassTag ](
+		fun: ( Int ) => OutT,
+		defValue: OutT,
+		log: Boolean = false
+	): RDD[ OutT ] = runDistributedRdd( fun, defValue, Option.empty[ OutT => Boolean ], log )
+
+	private[graphblas] def runDistributed[ OutT : ClassTag ](
+		fun: ( Int ) => OutT,
+		defValue: OutT,
+		filter: Option[ OutT => Boolean ],
+		log: Boolean
+	): Array[ OutT ] = {
+		val user_vals = runDistributedRdd( fun, defValue, filter, log )
+		user_vals.collect()
+	}
+
+	private[graphblas] def runDistributed[ OutT : ClassTag ](
 		fun: ( Int ) => OutT,
 		defValue: OutT,
 		filter: OutT => Boolean,
 		log: Boolean = false
 	): Array[ OutT ] = runDistributed[ OutT ]( fun, defValue, Option( filter ), log )
 
-	private def runDistributed[ OutT : ClassTag  ](
+	private[graphblas] def runDistributed[ OutT : ClassTag  ](
 		fun: ( Int ) => OutT,
 		defValue: OutT
 	): Array[ OutT ] = runDistributed[ OutT ](fun, defValue, Option.empty[ OutT => Boolean ], false )
@@ -170,64 +187,10 @@ class GraphBLAS( val sc: SparkContext ) extends AutoCloseable {
 		exit()
 	}
 
-	/**
-	 * Performs a pagerank computation with GraphBLAS handling matrix input.
-	 *
-	 * @param[in,out] sc       The Spark context.
-	 * @param[in,out] instance The GraphBLAS context.
-	 * @param[in]     filename The absolute path to the matrix file. This file
-	 *                         must exist on each worker node, and must have the
-	 *                         exact same contents.
-	 *
-	 * @returns A handle to the distributed PageRank vector.
-	 */
-	def pagerank( filename: String ) : Map[Int, Long] = {
-		// val bcm = bcmap
-		val bci = bc_instances
-		val fun = ( s: Int ) => {
-			val pointer_array: Array[(Int,Long)] = bci.value.filter( _._1 == s )
-			assert( pointer_array.size == 1 )
-			println(s"------->>>>>>>> s = ${s} entered")
-			val ret = Native.execIO( pointer_array(0)._2, Native.PAGERANK_GRB_IO, filename )
-			(s, ret)
-		}
-		val arr = runDistributed( fun, (-1, 0L), ( x: (Int, Long) ) => x._2 != 0L, true )
-		logMessage( "Collected data instances per node:" )
-		arr.foreach( l => {
-			logMessage( s"node ${l._1} value ${l._2.toHexString}" )
-		})
-		arr.toMap
-	}
-
-	/**
-	 * Retrieves the maximum value and its index from a given vector.
-	 *
-	 * @param[in,out] sc   The Spark context.
-	 * @param[in] instance The GraphBLAS context.
-	 * @param[in] vector   The vector of which to find its maximum element.
-	 *
-	 * @returns A pair where the first element indicates an index and the second
-	 *          its value.
-	 */
-	def max( vector: Map[Int, Long] ) : (Long, Double) = {
-		val fun = ( s: Int ) => {
-			val index = Native.argmax( vector(s) );
-			val value = Native.getValue( vector(s), index );
-			(index, value)
-		}
-		val out = runDistributed( fun, (-1L, 0.0), ( x: (Long, Double ) ) => x._1 != -1L )
-		val init = out(0)
-		val ret: (Long, Double) = out.foldLeft( init )( (x: (Long, Double), y: (Long, Double) ) => {
-				if( x._2 > y._2 ) { x } else { y }
-			}
-		)
-		ret
-	}
-
 	def getRunStats() : (Long, Long, Long) = {
 		val fun = ( s: Int ) => {
 			val iters: Long = Native.getIterations();
-			val outer: Long = Native.getOuterIterations();
+			val outer: Long = GraphBLAS.outerIterations;
 			val time: Long = Native.getTime();
 			(s, iters, outer, time)
 		}
@@ -237,166 +200,18 @@ class GraphBLAS( val sc: SparkContext ) extends AutoCloseable {
 		assert( arr.length == 1 )
 		( arr( 0 )._2, arr( 0 )._3, arr( 0 )._4 )
 	}
-
-	/**
-	 * Destroys a given output vector.
-	 *
-	 * @param[in,out] sc   The Spark context.
-	 * @param[in] instance The GraphBLAS context.
-	 * @param[in] vector   The vector of which to find its maximum element.
-	 */
-	def destroy( vector: Map[Int, Long] ) : Unit = {
-		runDistributed( ( s: Int ) => {
-			Native.destroyVector( vector(s) );
-		}, () )
-	}
-
-	def createMatrix( file: String ): Unit /*SparseMatrix*/ = {
-		// val numExecutors: Int = unique_hostnames.length;
-		// val coalesced = rdd.coalesce( numExecutors );
-		// val numPartitions: Int = coalesced.partitions.length;
-		// if( numPartitions > numExecutors ) {
-		// 	throw new java.lang.Exception( s"Coalesce did not reduce to ${numExecutors} or less parts!" );
-		// }
-		val matrix = MatrixMarketReader.readMM( sc, file )
-
-		val numPartitions = matrix.data.partitions.length
-		println( s"-->> num partitions for matrix: ${numPartitions}" )
-		println( s"-->> number of elements: ${matrix.data.count()}, advertized ${matrix.nnz}" )
-
-		// val bcm = bcmap
-		val itemsPerPartition = matrix.data.persist().mapPartitionsWithIndex(
-			( index: Int, it: Iterator[(Long,Iterable[Long],Iterable[Double])] ) => {
-				// val list = it.toList
-				var localNonzeroes: Long = 0L
-				while( it.hasNext ) {
-					val cols = it.next()._2
-					localNonzeroes += cols.size
-				}
-				Iterator(( index, Native.addDataSeries( index, localNonzeroes ) , localNonzeroes ) )
-			}
-		).collect().foreach( x => {
-			println( s"index ${x._1}, value ${x._2}, size ${x._3}" )
-		} )
-
-		println( "-->>> allocating memory" )
-
-		runDistributed( ( a: Int ) => {
-			Native.allocateIngestionMemory();
-		}, () )
-
-		println( "-->>> memory allocated, now adding data" )
-
-		matrix.data.foreachPartition(
-			( data: Iterator[(Long,Iterable[Long],Iterable[Double])] ) => {
-				val index: Int = TaskContext.getPartitionId()
-				val fieldOffset: Long = Native.getOffset()
-				val baseAddress: Long = Native.getIndexBaseAddress( index )
-
-				val unsafe = Native.getTheUnsafe()
-				assert( unsafe != null )
-
-				var offset: Long = 0L
-				while( data.hasNext ){
-					val rowEntry = data.next()
-					val row = rowEntry._1
-					var cols = rowEntry._2.iterator
-					while( cols.hasNext ){
-						// println( s"writing at offset ${offset}" )
-						val address = baseAddress + offset
-						unsafe.putLong( address, row )
-						unsafe.putLong( address + fieldOffset, cols.next() )
-						offset += ( 2 * fieldOffset )
-					}
-				}
-			}
-		)
-
-		println( "-->>> now cleaning data" )
-
-		runDistributed( ( a: Int ) => {
-			Native.cleanIngestionData();
-		}, () )
-
-		// val matrix_pointers = sc.parallelize( 0 until P ).map {
-		// 	pid => {
-		// 		var init: Long = 0;
-		// 		val hostname: String = Utils.getHostnameUnique();
-		// 		if( instance._2.value.threadID( hostname ) == 0 ) {
-		// 			val s: Int = instance._2.value.processID( hostname );
-		// 			init = Native.matrixInput( s, P );
-		// 		}
-		// 		(pid,init)
-		// 	}
-		// }.collect().toArray;
-
-		// val fun = ( s: Int ) => {
-		// 	( s, Native.matrixInput( s, numExecutors ) )
-		// }
-
-		// val matrix_pointers = runDistributed( fun, ( -1, 0L ) ).toMap
-
-		//note: it is *not* necessary to spawn exactly P threads here, as the call does not require communication
-		//TODO FIXME in fact, there is even no need to coalesce as long as matrixAddRow is thread-safe!!
-		// val init_pointers = coalesced.mapPartitionsWithIndex {
-		// 	(pid, iterator) => {
-		// 		var matrix_pointer: Long = 0
-		// 		val hostname: String = Utils.getHostnameUnique();
-		// 		if( instance._2.value.threadID( hostname ) == 0 ) {
-		// 			val s = instance._2.value.processID( hostname );
-		// 			matrix_pointer = matrix_pointers.filter( x => x._1 == s ).map( x => x._2 ).head;
-		// 			while( iterator.hasNext ) {
-		// 				val triple = iterator.next();
-		// 				//Native.matrixAddRow( matrix_pointer, triple._1, triple._2.toArray, triple._2.toArray );
-		// 				Native.matrixAddRow( matrix_pointer, triple._1, triple._2.toArray ); //pattern matrices only, for now
-		// 			}
-		// 		}
-		// 		Iterator( (pid, matrix_pointer) )
-		// 	}
-		// };
-
-		// val out = sc.parallelize( 0 until P ).map {
-		// 	pid => {
-		// 		var init_pointer: Long = 0
-		// 		var matrix_pointer: Long = 0;
-		// 		val hostname: String = Utils.getHostnameUnique();
-		// 		if( instance._2.value.threadID( hostname ) == 0 ) {
-		// 			val s = instance._2.value.processID( hostname );
-		// 			init_pointer = matrix_pointers.filter( x => x._1 == s ).map( x => x._2 ).head;
-		// 			matrix_pointer = Native.matrixDone( init_pointer );
-		// 		}
-		// 		(pid,matrix_pointer)
-		// 	}
-		// };
-
-		// //done
-		// new SparseMatrix( out.collect().toArray );
-	}
-
-	/**
-	 * Creates a randomly generated GraphBLAS sparse matrix.
-	 *
-	 * @param[in] sc   The Spark context.
-	 * @param[in] rows The number of desired rows.
-	 * @param[in] cols The number of desired columns.
-	 * @param[in] density The desired density.
-	 * @param[in] variation The desired variation in row densities.
-	 * @param[in] P    The number of processes to distribute over.
-	 */
-	/*def createRandomMatrix( sc: org.apache.spark.SparkContext, instance: Instance, rows: Long, cols: Long, density: Int, variation: Double ): SparseMatrix = {
-		val rdd_in = createRandomMatrixRDD( sc, rows, cols, density, variation );
-		createMatrix( sc, instance, rdd_in )
-	}*/
-
 }
 
+
 object GraphBLAS {
+
+	final val outerIterations = 5
 
 	private val lock = new Object()
 
 	private var context: Option[GraphBLAS] = None
 
-	private[huawei] def markConstructed(instance: GraphBLAS): Unit = {
+	private[graphblas] def markConstructed(instance: GraphBLAS): Unit = {
 		lock.synchronized {
 			if( context.isDefined ) {
 				throw new Exception( "GraphBLAS object already defined" )
@@ -405,7 +220,7 @@ object GraphBLAS {
 		}
 	}
 
-	private[huawei] def removeConstructed(instance: GraphBLAS): Unit = {
+	private[graphblas] def removeConstructed(instance: GraphBLAS): Unit = {
 		lock.synchronized {
 			if( !context.isDefined ) {
 				throw new Exception( "GraphBLAS object not defined" )

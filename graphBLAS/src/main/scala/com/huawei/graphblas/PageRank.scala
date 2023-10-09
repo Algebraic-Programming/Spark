@@ -1,0 +1,43 @@
+package com.huawei.graphblas
+
+import com.huawei.graphblas.Native
+import com.huawei.graphblas.GraphBLASMatrix
+import com.huawei.graphblas.PageRankResult
+
+
+object PageRank {
+
+	def runFromMatrix( matrix: GraphBLASMatrix ): PageRankResult = {
+
+		val results = matrix.grbMatAddresses.map( ( matrix: Long ) => {
+			if( matrix != 0L ) {
+				Native.pagerankFromGrbMatrix( matrix )
+			} else 0L
+		}
+		).persist()
+		new PageRankResult( matrix.grb, results )
+	}
+
+
+	/**
+	 * Performs a pagerank computation with GraphBLAS handling matrix input.
+	 *
+	 * @param[in,out] sc       The Spark context.
+	 * @param[in,out] instance The GraphBLAS context.
+	 * @param[in]     filename The absolute path to the matrix file. This file
+	 *                         must exist on each worker node, and must have the
+	 *                         exact same contents.
+	 *
+	 * @returns A handle to the distributed PageRank vector.
+	 */
+	def runFromFile( grb: GraphBLAS, filename: String ) : PageRankResult = {
+		val fun = ( s: Int ) => {
+			val ret = Native.pagerankFromFile( filename )
+			(s, ret)
+		}
+		val filter = ( x: (Int, Long) ) => x._1 != -1
+		val arr = grb.runDistributedRdd( fun, (-1, 0L), filter, true )
+		println( "Collected data instances per node:" )
+		new PageRankResult( grb, arr.map( p => p._2 ) )
+	}
+}

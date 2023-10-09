@@ -25,7 +25,10 @@ import org.apache.spark.SparkContext
 import scala.util.Using
 
 import com.huawei.Utils
-import com.huawei.GraphBLAS
+import com.huawei.graphblas.GraphBLAS
+import com.huawei.graphblas.PageRank
+import com.huawei.graphblas.PageRankResult
+
 
 object Pagerank {
 
@@ -65,29 +68,28 @@ object Pagerank {
 			println("====================================")
 
 			val t1 = System.nanoTime()
-			val output = grb.pagerank( filePath )
-			println("====================================")
-			println("    GraphBLAS PageRank completed")
-			println("====================================")
-			val t2 = System.nanoTime()
-			println("output contents:")
-			println(output)
-			val t3 = System.nanoTime()
-			val maxpair = grb.max( output )
-			val t4 = System.nanoTime()
-			println("maximum PageRank entry:")
-			println(maxpair)
-			grb.destroy( output )
+			val ( algoTime: Double, maxTime: Double ) = Using(
+				PageRank.runFromFile( grb, filePath ) ) { results: PageRankResult => {
+				val t2 = System.nanoTime()
+				println("====================================")
+				println("    GraphBLAS PageRank completed")
+				println("====================================")
+				val t3 = System.nanoTime()
+				val maxpair = results.max()
+				val t4 = System.nanoTime()
+				println("maximum PageRank entry:")
+				println(maxpair)
+				val t21 = (t2 - t1) / 1000000000.0
+				val t43 = (t4 - t3) / 1000000000.0
+				( t21, t43 )
+			} }.get
 			val ( iters: Long, outer: Long, time: Long ) = grb.getRunStats()
 			val avgTimeSecs = ( time.toDouble / outer.toDouble ) / 1000000000.0
 			println( s"Iterations: $iters, outer iterations: $outer, time per outer iteration: $avgTimeSecs seconds" )
-			// grb.close()
 			println("GraphBLAS cleaned up.")
 			val time_taken = (System.nanoTime() - t0) / 1000000000.0
-			val t21 = (t2 - t1) / 1000000000.0
-			val t43 = (t4 - t3) / 1000000000.0
-			println( s"Accelerated PageRank call: $t21 seconds." )
-			println( s"Max extraction call: $t43 seconds." )
+			println( s"Accelerated PageRank call: $algoTime seconds." )
+			println( s"Max extraction call: $maxTime seconds." )
 			println( s"End-to-end time taken: $time_taken seconds." )
 		} }
 	}

@@ -43,9 +43,9 @@ package_jars:
 assemble_jars:
 	sbt assembly
 
-build/com_huawei_graphblas_Native.h: graphBLAS/src/main/java/com/huawei/graphblas/Native.java graphBLAS/src/main/java/com/huawei/graphblas/Loader.java
+build/com_huawei_graphblas_Native.h: graphBLAS/src/main/java/com/huawei/graphblas/Native.java
 	mkdir build || true
-	$(JAVAC) -cp java -d ./build -h ./build "$<"
+	$(JAVAC) -cp graphBLAS/src/main/java -d ./build -h ./build "$<"
 
 build/native.o: cpp/native.cpp build/com_huawei_graphblas_Native.h cpp/sparkgrb.hpp cpp/pagerank.hpp
 	${CXX} ${CPPFLAGS} -fPIC -Ibuild/ -I${GRB_INSTALL_PATH}/include/:./cpp/ -c -o "$@" "$<"

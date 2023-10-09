@@ -17,6 +17,8 @@
 package com.huawei
 
 import java.net.InetAddress
+import sun.misc.Unsafe
+import java.lang.reflect.Field
 
 import org.apache.spark.SparkEnv
 
@@ -30,7 +32,6 @@ package object Utils {
 	final def getHostnameUnique() : String = {
 		getHostname() + "-" + SparkEnv.get.executorId
 	}
-
 
 } // end object Utils
 

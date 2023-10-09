@@ -24,7 +24,7 @@ import org.apache.spark.SparkContext
 import scala.util.Using
 
 import com.huawei.Utils
-import com.huawei.GraphBLAS
+import com.huawei.graphblas.GraphBLAS
 
 object Initialise {
 
@@ -40,16 +40,11 @@ object Initialise {
 	}
 
 	def main( args: Array[String] ): Unit = {
-		// if( args.length != 1 ) {
-		// 	println( "Example requires number of parameters is passed as its first and only argument." );
-		// 	return;
-		// }
 		val conf = new SparkConf().setAppName( "Spark GraphBLAS Initialise" )
 
 		val sc = new SparkContext( conf );
 
 		val t0 = System.nanoTime();
-
 
 		println("Now creating GraphBLAS launcher:")
 		Using( new GraphBLAS( sc ) ) { grb => {

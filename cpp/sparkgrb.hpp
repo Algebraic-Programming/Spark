@@ -14,11 +14,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifndef _H_SPARKGRB
-#define _H_SPARKGRB
+#pragma once
 
 #include <vector>
+#include <limits>
 
 #include "graphblas.hpp"
 
@@ -36,35 +35,56 @@
 typedef grb::Launcher< grb::EXEC_MODE::MANUAL > Persistent;
 
 /** Persistent data used for streaming in pattern matrix data. */
-typedef struct {
-	size_t m;
-	size_t n;
-	std::vector< size_t > rows;
-	std::vector< size_t > cols;
-} MatrixUnderConstruction;
+// typedef struct {
+// 	size_t m;
+// 	size_t n;
+// 	std::vector< size_t > rows;
+// 	std::vector< size_t > cols;
+// } MatrixUnderConstruction;
 
 /** A list of all supported GraphBLAS subroutines / programs. */
 enum SupportedPrograms { PAGERANK_GRB_IO };
 
+struct pagerank_input {
+	grb::Matrix< void > * data = nullptr;
+	double tolerance = 0.0000001;
+	unsigned max_iterations = 80;
+	unsigned outer_iters = 5;
+	double alpha = 0.85;
+
+	pagerank_input() = default;
+
+	pagerank_input( const pagerank_input & ) = default;
+};
+
 /**
  * Generic input to GraphBLAS subroutines / programs.
  */
-typedef struct {
-	char data[ 1024 ];
-	SupportedPrograms program;
-} GrB_Input;
+struct pagerank_file_input : pagerank_input {
+
+	static constexpr unsigned STR_SIZE = 1023;
+
+	char infile[ STR_SIZE + 1 ] = {'\0'};
+
+	pagerank_file_input() = default;
+};
 
 /**
  * Generic output struct of GraphBLAS subroutines / programs.
  */
-typedef struct {
-	enum grb::RC error_code;
-	size_t iterations;
-	double residual;
-	grb::PinnedVector< double > * pinnedVector;
-} GrB_Output;
+struct pagerank_output {
+	enum grb::RC error_code = grb::SUCCESS;
+	size_t iterations = 0;
+	double residual = std::numeric_limits< double >::max();
+	grb::PinnedVector< double > * pinnedVector = nullptr;
 
-void grb_pagerank( const GrB_Input &data_in, GrB_Output &out );
+	pagerank_output() = default;
 
-#endif
+	pagerank_output( const pagerank_output & ) = delete;
+};
 
+void set_omp_threads();
+
+void do_pagerank( const pagerank_input &, pagerank_output & );
+
+void grb_pagerank_from_file( const pagerank_file_input &, pagerank_output & );

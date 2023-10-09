@@ -16,7 +16,7 @@
  */
 
 #include "com_huawei_graphblas_Native.h"
-#include "graphblas.hpp"
+#include <graphblas.hpp>
 #include "sparkgrb.hpp"
 #include "pagerank.hpp"
 
@@ -28,7 +28,6 @@
 #include <stdlib.h>
 #include <fstream>
 #include <atomic>
-#include <mutex>
 #include <condition_variable>
 #include <stdexcept>
 #include <cstdio>
@@ -40,15 +39,88 @@
 #include <sys/types.h>
 #include <fstream>
 
+#include "matrix_entry.hpp"
+#include "ingestion_data.hpp"
+#include "entry_iterator.hpp"
+#include "build_matrix_from_iter.hpp"
+
 static Persistent * grb_instance = nullptr;
 
 // do not initialize MPI when loading the library
 const int LPF_MPI_AUTO_INITIALIZE = 0;
 
-JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_execIO( JNIEnv * env, jclass classDef, jlong instance, jint program, jstring filename ) {
-	(void) classDef;
-	(void) instance;
+int executor_threads = -1;
 
+void set_omp_threads() {
+	if( executor_threads != -1 ) {
+		omp_set_num_threads( executor_threads );
+	}
+}
+
+JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_start(
+	JNIEnv *env,
+	jclass,
+	jstring hostname,
+	jint pid,
+	jint P,
+	jint threads
+) {
+#ifdef FILE_LOGGING
+	FILE * file = fopen( "/tmp/graphblastest.txt", "a" );
+	assert( file != NULL );
+#endif
+	const char * const hostname_c = env->GetStringUTFChars( hostname, NULL );
+	assert( hostname_c != NULL );
+#ifdef FILE_LOGGING
+	(void)fprintf( file,
+		"I am process %d. I am about to create a grb::Launcher in manual mode. The "
+		"hostname string I am passing to bsp_mpi_initialize_over_tcp is %s, and I "
+		"am hardcoded to try port 7177. My LPF ID is %d, and the expected number "
+		"of LPF processes is %d\n",
+		getpid(), hostname_c, pid, P );
+	(void)fflush( file );
+#endif
+	std::string hostname_str = hostname_c;
+	env->ReleaseStringUTFChars( hostname, hostname_c );
+	Persistent * const ret = new Persistent( pid, P, hostname_str, "7177", false );
+	grb::utils::ignoreNonExistantId = true;
+	grb_instance = ret;
+	executor_threads = (int)threads;
+	assert( ret != NULL );
+#ifdef FILE_LOGGING
+	// do some logging
+	(void)fprintf( file, "Launcher instance @ %p\n", ret );
+	(void)fclose( file );
+#endif
+	return reinterpret_cast< long >( ret );
+}
+
+JNIEXPORT void JNICALL Java_com_huawei_graphblas_Native_end( JNIEnv *, jclass, jlong ) {
+#ifdef FILE_LOGGING
+	FILE * file = fopen( "/tmp/graphblastest.txt", "a" );
+#endif
+	if( grb_instance == nullptr ) {
+		throw std::runtime_error( "instance not valid" );
+	}
+	executor_threads = -1;
+	Persistent * const launcher_p = grb_instance;
+#ifdef FILE_LOGGING
+	(void) fprintf( file, "I am process %d. I am about to delete the launcher at %p... ", getpid(), launcher_p );
+	(void) fflush( file );
+#endif
+	assert( launcher_p != NULL );
+	delete launcher_p;
+#ifdef FILE_LOGGING
+	(void) fprintf( file, "done!\n" );
+	(void) fclose( file );
+#endif
+}
+
+JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_pagerankFromFile(
+		JNIEnv * env,
+		jclass,
+		jstring filename
+) {
 	const char * const cfn = env->GetStringUTFChars( filename, NULL );
 
 	// parse arguments
@@ -71,18 +143,22 @@ JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_execIO( JNIEnv * env, j
 #endif
 
 	// prepare input
-	GrB_Input in;
+	pagerank_file_input in;
 	size_t cfn_size = strlen( cfn );
-	if( cfn_size > 1023 ) {
-		cfn_size = 1023;
+	if( cfn_size > pagerank_file_input::STR_SIZE ) {
+		cfn_size = pagerank_file_input::STR_SIZE;
+#ifdef FILE_LOGGING
+		(void)fprintf( file, "input string is too long.\n" );
+#endif
+		env->ReleaseStringUTFChars( filename, cfn );
+		return 0L;
 	}
-	strncpy( &( in.data[ 0 ] ), cfn, 1023 );
-	in.data[ 1023 ] = '\0';
-	in.program = PAGERANK_GRB_IO;
+	strncpy( in.infile, cfn, pagerank_file_input::STR_SIZE );
 	env->ReleaseStringUTFChars( filename, cfn );
+	in.infile[ pagerank_file_input::STR_SIZE ] = '\0';
 
 	// prepare output
-	GrB_Output out;
+	pagerank_output out;
 	out.error_code = grb::SUCCESS;
 	out.iterations = 0;
 	out.residual = 0.0;
@@ -95,19 +171,13 @@ JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_execIO( JNIEnv * env, j
 #endif
 
 	// execute
-	if( program == 0 ) {
-		launcher_p->exec( &grb_pagerank, in, out, true );
+	launcher_p->exec( &grb_pagerank_from_file, in, out, false );
 #ifdef FILE_LOGGING
-		std::string error = grb::toString( out.error_code );
-		(void)fprintf( file, "Error code returned: %s\n", error.c_str() );
-		(void)fprintf( file, "Number of iterations: %zd\n", out.iterations );
-		(void)fprintf( file, "Final residual: %lf\n", out.residual );
+	std::string error = grb::toString( out.error_code );
+	(void)fprintf( file, "Error code returned: %s\n", error.c_str() );
+	(void)fprintf( file, "Number of iterations: %zd\n", out.iterations );
+	(void)fprintf( file, "Final residual: %lf\n", out.residual );
 #endif
-	} else {
-#ifdef FILE_LOGGING
-		(void)fprintf( file, "Unknown program requested: %d. Ignoring call.\n", program );
-#endif
-	}
 
 #ifdef FILE_LOGGING
 	(void)fprintf( file,
@@ -120,108 +190,33 @@ JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_execIO( JNIEnv * env, j
 	return reinterpret_cast< long >( out.pinnedVector );
 }
 
-JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_start( JNIEnv * env, jclass classDef, jstring hostname, jint pid, jint P, jint threads ) {
-	(void) env;
-	(void) classDef;
-#ifdef FILE_LOGGING
-	FILE * file = fopen( "/tmp/graphblastest.txt", "a" );
-	assert( file != NULL );
-#endif
-	char num_threads_env_var[ 16 ];
-	sprintf( num_threads_env_var, "%d", (int)threads );
-	setenv( "OMP_NUM_THREADS", num_threads_env_var, 1 ); // workaround to tell OMP the number of threads from Spark
-	const char * const hostname_c = env->GetStringUTFChars( hostname, NULL );
-	assert( hostname_c != NULL );
-#ifdef FILE_LOGGING
-	(void)fprintf( file,
-		"I am process %d. I am about to create a grb::Launcher in manual mode. The "
-		"hostname string I am passing to bsp_mpi_initialize_over_tcp is %s, and I "
-		"am hardcoded to try port 7177. My LPF ID is %d, and the expected number "
-		"of LPF processes is %d\n",
-		getpid(), hostname_c, pid, P );
-	(void)fflush( file );
-#endif
-	std::string hostname_str = hostname_c;
-	env->ReleaseStringUTFChars( hostname, hostname_c );
-	Persistent * const ret = new Persistent( pid, P, hostname_str, "7177", false );
-	grb_instance = ret;
-	assert( ret != NULL );
-#ifdef FILE_LOGGING
-	// do some logging
-	(void)fprintf( file, "Launcher instance @ %p\n", ret );
-	(void)fclose( file );
-#endif
-	return reinterpret_cast< long >( ret );
-}
-
-JNIEXPORT void JNICALL Java_com_huawei_graphblas_Native_end( JNIEnv * env, jclass classDef, jlong data ) {
-	(void) env;
-	(void) classDef;
-	(void) data;
-#ifdef FILE_LOGGING
-	FILE * file = fopen( "/tmp/graphblastest.txt", "a" );
-#endif
+JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_pagerankFromGrbMatrix(
+		JNIEnv *,
+		jclass,
+		jlong matrix
+) {
 	if( grb_instance == nullptr ) {
 		throw std::runtime_error( "instance not valid" );
 	}
 	Persistent * const launcher_p = grb_instance;
-#ifdef FILE_LOGGING
-	(void) fprintf( file, "I am process %d. I am about to delete the launcher at %p... ", getpid(), launcher_p );
-	(void) fflush( file );
-#endif
-	assert( launcher_p != NULL );
-	delete launcher_p;
-#ifdef FILE_LOGGING
-	(void) fprintf( file, "done!\n" );
-	(void) fclose( file );
-#endif
+	grb::Matrix< void > * mat = reinterpret_cast< grb::Matrix< void > * >( matrix ) ;
+	pagerank_input in;
+	in.data = mat;
+
+	pagerank_output out;
+	printf("--->>> invoking do_pagerank\n");
+	fprintf( stderr, "--->>> invoking do_pagerank\n");
+
+	char num_threads_env_var[] = "44";
+	setenv( "OMP_NUM_THREADS", num_threads_env_var, 1 );
+
+	launcher_p->exec( &do_pagerank, in, out, false );
+	if( out.pinnedVector == nullptr ) {
+		throw std::runtime_error( "could not run pagerank" );
+	}
+	printf("--->>> do_pagerank successful!\n");
+	return reinterpret_cast< jlong >( out.pinnedVector );
 }
-
-
-
-
-
-
-
-// JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_createMatrix(
-//     JNIEnv * env, jclass classDef,
-//     jint pid, jint P,
-//     jstring path
-// ) {
-//     if( path == NULL ) {
-//         return 0;
-//     }
-//     jsize strlen = env->GetStringLength( path );
-//     if( strlen == 0 ) {
-//         return 0;
-//     }
-//     const char * const cfn = env->GetStringUTFChars( path, NULL );
-//     assert( cfn != NULL );
-//     const std::string fn = cfn;
-//     grb::utils::MatrixFileReader<void> reader = grb::utils::MatrixFileReader<void>( std::string(fn) );
-//     env->ReleaseStringUTFChars( path, cfn );
-//     if( reader.m() == 0 || reader.n() == 0 ) {
-//         return 0;
-//     }
-//     grb::Matrix<void> *ret = new grb::Matrix<void>( reader.m(), reader.n() );
-//     assert( ret != NULL );
-//     const grb::RC rc = grb::buildMatrixUnique( *ret, reader.cbegin(), reader.cend(), SEQUENTIAL );
-//     assert( rc == SUCCESS );
-//     return reinterpret_cast< jlong >(ret);
-// }
-
-
-std::mutex ingestion_mutex;
-
-struct ingestion_data {
-	std::atomic_size_t length;
-	std::unordered_map< int, std::size_t > index_length;
-
-	ingestion_data() : length( 0UL ) {}
-};
-
-struct ingestion_data * ingestion = nullptr;
-
 
 JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_addDataSeries(
     JNIEnv *, jclass,
@@ -230,38 +225,22 @@ JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_addDataSeries(
 	const int id = static_cast< int >( index );
 	const std::size_t len = static_cast< std::size_t >( length );
 
-	std::lock_guard<std::mutex> lock( ingestion_mutex );
+	ingestion_data< std::size_t, std::size_t > & ingestion =
+		ingestion_data< std::size_t, std::size_t >::get_instance();
+	std::size_t oldLength = ingestion.add_index( id, len );
 
-	if( ingestion == nullptr ) {
-		ingestion = new ingestion_data;
-	}
-	if( ingestion->index_length.find( id ) != ingestion->index_length.cend() ) {
-		printf( "index %d already present\n", id );
-		return -1;
-	}
-	std::size_t newLength = ingestion->length += len;
-	std::size_t oldLength = newLength - len;
-	printf( "inserting index %d\n", id );
-	ingestion->index_length.emplace( static_cast< int >( id ),
-		oldLength );
 	return static_cast< jlong >( oldLength );
 }
 
-#pragma pack(1)
-struct matrix_entry {
-	std::size_t row;
-	std::size_t col;
-};
 
-struct matrix_entry * entries = nullptr;
-
-
-JNIEXPORT void JNICALL Java_com_huawei_graphblas_Native_allocateIngestionMemory(
+JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_allocateIngestionMemory(
     JNIEnv *, jclass
 ) {
-	std::size_t size = ingestion->length * sizeof( matrix_entry );
-	entries = ( matrix_entry * )memalign( sizeof( matrix_entry ), size );
-	printf( "allocating size %lu at address %p\n", size, entries );
+	ingestion_data< std::size_t, std::size_t > & ingestion =
+		ingestion_data< std::size_t, std::size_t >::get_instance();
+	ingestion.allocate_entries();
+	printf( "allocating entries\n" );
+	return reinterpret_cast< jlong >( &ingestion );
 }
 
 JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_getOffset(
@@ -270,110 +249,92 @@ JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_getOffset(
 	return static_cast< jlong >( sizeof( std::size_t ) );
 }
 
-
-
 JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_getIndexBaseAddress(
     JNIEnv *, jclass,
     jint index
 ) {
+	ingestion_data< std::size_t, std::size_t > & ingestion =
+		ingestion_data< std::size_t, std::size_t >::get_instance();
 	const int id = static_cast< int >( index );
-	typename std::unordered_map< int, std::size_t >::const_iterator el =
-		ingestion->index_length.find( id );
-	if( el == ingestion->index_length.cend() ) {
-		printf( "index %d is absent\n", id );
-		throw std::runtime_error( "index " + std::to_string( index ) + " not present" );
-		// return static_cast< jlong >( std::numeric_limits< long >::max() );
+	return reinterpret_cast< jlong >( ingestion.get_index_storage( id ) );
+}
+
+JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_ingestIntoMatrix(
+    JNIEnv *, jclass,
+	jlong rows, jlong cols
+) {
+	Persistent * const launcher_p = grb_instance;
+
+	std::size_t r = static_cast< std::size_t >( rows ), c = static_cast< std::size_t >( cols );
+
+	ingestion_data< std::size_t, std::size_t > & ingestion =
+		ingestion_data< std::size_t, std::size_t >::get_instance();
+
+	grb::Matrix< void >* ret = nullptr;
+
+	build_params< std::size_t, std::size_t > input{ ingestion, r, c };
+
+	printf("invoking matrix construction\n");
+
+	grb::RC rc = launcher_p->exec( build_matrix_from_iterator< std::size_t, std::size_t, void >, input, ret, false );
+
+	if( rc != grb::SUCCESS ) {
+		throw std::runtime_error( "cannot invoke matrix construction" );
 	}
-	return reinterpret_cast< jlong >( entries + el->second );
+	if( ret == nullptr ) {
+		throw std::runtime_error( "matrix construction failed" );
+	}
+	printf( "matrix constructed\n" );
+
+	return reinterpret_cast< jlong >( ret );
 }
 
 JNIEXPORT void JNICALL Java_com_huawei_graphblas_Native_cleanIngestionData(
     JNIEnv *, jclass
 ) {
-	delete ingestion;
-	ingestion = nullptr;
-	free( entries );
-	entries = nullptr;
+	ingestion_data< std::size_t, std::size_t >::clear_instance();
 }
 
 
-/*
-MatrixUnderConstruction * ret = nullptr;
-
-JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_matrixInput(
-    JNIEnv * env, jclass classDef,
-    jint nrows, jint ncols
-) {
-    ret = new MatrixUnderConstruction();
-    assert( ret != NULL );
-    ret->m = nrows;
-    ret->n = ncols;
-    return reinterpret_cast< jlong >(ret);
-}
-
-JNIEXPORT void JNICALL Java_com_huawei_graphblas_Native_matrixAddRow(
-    JNIEnv * env, jclass classDef,
-    jlong matrixInput,
-    jlong row, jlongArray colind
-) {
-    assert( matrixInput != 0 );
-    MatrixUnderConstruction &matrix = *reinterpret_cast< MatrixUnderConstruction* >(matrixInput);
-    if( matrix.m == 0 || matrix.n == 0 ) {
-        return;
-    }
-    assert( row < matrix.m );
-    const jint nonzeroes = env->GetArrayLength( colind );
-    if( nonzeroes == 0 ) {
-        return;
-    }
-    jlong * array = static_cast< jlong* >(env->GetPrimitiveArrayCritical( colind, NULL ));
-    assert( array != NULL );
-    for( size_t i = 0; i < nonzeroes; ++i ) {
-        matrix.rows.push_back( row );
-        matrix.cols.push_back( array[i] );
-    }
-    env->ReleasePrimitiveArrayCritical( colind, array, JNI_ABORT );
-    return;
-}
-
-JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_matrixDone(
-    JNIEnv * env, jclass classDef,
-    jlong matrixInput
-) {
-    typedef std::vector<size_t>::const_iterator SubIterator;
-    MatrixUnderConstruction &matrix = *reinterpret_cast< MatrixUnderConstruction* >(matrixInput);
-    grb::Matrix<void> * const ret = new grb::Matrix<void>( matrix.m, matrix.n );
-    assert( ret != NULL );
-    auto start = grb::utils::SynchronizedNonzeroIterator< size_t, size_t, void, SubIterator, SubIterator, void >(
-        matrix.rows.cbegin(), matrix.cols.cbegin()
-    );
-    const auto end = grb::utils::SynchronizedNonzeroIterator< size_t, size_t, void, SubIterator, SubIterator, void >(
-        matrix.rows.cend(), matrix.cols.cend()
-    );
-    const grb::RC rc = grb::buildMatrixUnique( *ret, start, end, PARALLEL );
-    assert( rc == SUCCESS );
-    delete &matrix;
-    return reinterpret_cast< jlong >(ret);
+template< typename ValT >
+void delete_matrix( grb::Matrix< ValT >* const &mat, grb::RC &out ) {
+	set_omp_threads();
+	try {
+    	delete mat;
+	} catch ( ... ) {
+		out = grb::PANIC;
+		return;
+	}
+	out = grb::SUCCESS;
 }
 
 JNIEXPORT void JNICALL Java_com_huawei_graphblas_Native_destroyMatrix(
-    JNIEnv * env, jclass classDef,
+    JNIEnv *, jclass,
     jlong matrix
 ) {
-    delete reinterpret_cast< grb::Matrix<void>* >(matrix);
+	if( grb_instance == nullptr ) {
+		throw std::runtime_error( "instance not valid" );
+	}
+	if( matrix == 0L ) {
+		printf("wrong pointer passed\n");
+		return;
+	}
+	Persistent * const launcher_p = grb_instance;
+    grb::Matrix< void >* p = reinterpret_cast< grb::Matrix< void >* >(matrix);
+	grb::RC out = grb::PANIC;
+	printf( "invoking matrix destruction\n" );
+	grb::RC rc = launcher_p->exec( delete_matrix, p, out, false );
+	if( out != grb::SUCCESS || rc != grb::SUCCESS ) {
+		throw std::runtime_error( "cannot invoke matrix deletion" );
+	}
+	printf( "matrix destroyed\n" );
 }
-*/
 
-
-
-
-
-
-
-
-JNIEXPORT void JNICALL Java_com_huawei_graphblas_Native_destroyVector( JNIEnv * env, jclass classDef, jlong vector ) {
-	(void) env;
-	(void) classDef;
+JNIEXPORT void JNICALL Java_com_huawei_graphblas_Native_destroyVector( JNIEnv *, jclass, jlong vector ) {
+	if( vector == 0L ) {
+		printf("wrong pointer passed\n");
+		return;
+	}
 
 	grb::PinnedVector< double > * pointer = reinterpret_cast< grb::PinnedVector< double > * >( vector );
 #ifdef FILE_LOGGING
@@ -381,11 +342,13 @@ JNIEXPORT void JNICALL Java_com_huawei_graphblas_Native_destroyVector( JNIEnv * 
 	(void) fprintf( file, "About to delete the PinnedVector at %p...", pointer );
 	(void) fflush( file );
 #endif
+	printf( "invoking matrix destruction\n" );
 	delete pointer;
 #ifdef FILE_LOGGING
 	(void) fprintf( file, "done!\n" );
 	(void) fclose( file );
 #endif
+	printf( "vector destroyed\n" );
 }
 
 JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_argmax( JNIEnv * env, jclass classDef, jlong vector ) {
@@ -441,7 +404,7 @@ JNIEXPORT jdouble JNICALL Java_com_huawei_graphblas_Native_getValue( JNIEnv * en
 	double ret = 0;
 	bool found = false;
 	for( size_t i = 0; i < pointer->nonzeroes(); ++i ) {
-		assert( pointer->getNonzeroIndex <= std::numeric_limits< jlong >::max() );
+		assert( pointer->getNonzeroIndex( i ) <= std::numeric_limits< size_t >::max() );
 		if( pointer->getNonzeroIndex( i ) == static_cast< size_t >(index) ) {
 			ret = pointer->getNonzeroValue( i );
 			found = true;
@@ -462,9 +425,7 @@ JNIEXPORT jdouble JNICALL Java_com_huawei_graphblas_Native_getValue( JNIEnv * en
 	return static_cast< jdouble >( ret );
 }
 
-
 static std::atomic_bool already_initialized(false);
-// static std::mutex sequence_mutex;
 
 JNIEXPORT jboolean JNICALL Java_com_huawei_graphblas_Native_enterSequence(
 	JNIEnv * env, jclass classDef
@@ -491,8 +452,3 @@ JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_getIterations(JNIEnv *,
 JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_getTime(JNIEnv *, jclass) {
 	return static_cast< jlong >( get_pr_time() );
 }
-
-JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_getOuterIterations(JNIEnv *, jclass) {
-	return static_cast< jlong >( get_pr_outer_iterations() );
-}
-

@@ -28,7 +28,7 @@
 #include "pagerank.hpp"
 
 
-constexpr unsigned outer_iters = 5;
+unsigned outer_iters = 5;
 using duration_t = std::chrono::time_point<std::chrono::high_resolution_clock>::duration;
 static duration_t pr_time = duration_t::zero();
 size_t iterations;
@@ -37,14 +37,70 @@ size_t get_pr_inner_iterations() {
 	return iterations;
 }
 
-size_t get_pr_outer_iterations() {
-	return outer_iters;
-}
-
 unsigned long get_pr_time() {
 	return static_cast< unsigned long >(
 		std::chrono::duration_cast<std::chrono::nanoseconds>( pr_time ).count()
 	);
+}
+
+void do_pagerank( const pagerank_input &data_in, pagerank_output &out ) {
+
+		set_omp_threads();
+	try {
+		const std::size_t n = grb::nrows( *data_in.data );
+		grb::Vector< double > pr( n ), workspace1( n ), workspace2( n ), workspace3( n );
+#ifdef FILE_LOGGING
+		(void) fprintf( file, "Output vector allocated, now passing to PageRank function\n" );
+		(void) fflush( file );
+#endif
+		out.error_code = grb::algorithms::simple_pagerank< grb::descriptors::no_operation >(
+			pr, *data_in.data,
+			workspace1, workspace2, workspace3,
+			/*0.85*/ data_in.alpha, data_in.tolerance, data_in.max_iterations,
+			&( out.iterations ), &( out.residual )
+		);
+		pr_time = duration_t::zero();
+		for( unsigned i = 0; i < data_in.outer_iters; i++ ) {
+			grb::clear( pr );
+			auto start = std::chrono::high_resolution_clock::now();
+			out.error_code = grb::algorithms::simple_pagerank< grb::descriptors::no_operation >(
+				pr, *data_in.data,
+				workspace1, workspace2, workspace3,
+				data_in.alpha, data_in.tolerance, data_in.max_iterations,
+				&( out.iterations ), &( out.residual )
+			);
+			auto end = std::chrono::high_resolution_clock::now();
+			pr_time += ( end - start );
+		}
+		iterations = out.iterations;
+
+		if( out.error_code != grb::SUCCESS ) {
+			std::string error_code = grb::toString( out.error_code );
+#ifdef FILE_LOGGING
+			(void) fprintf( file, "Call to PageRank failed with error code %s; ", error_code.c_str() );
+#endif
+			return;
+		}
+#ifdef FILE_LOGGING
+		(void) fprintf( file, "Call to PageRank successful; " );
+#endif
+		out.pinnedVector = new grb::PinnedVector< double >( pr, grb::PARALLEL );
+#ifdef FILE_LOGGING
+		(void) fprintf( file, "iters = %zd, residual = %.10e\n", out.iterations, out.residual );
+		(void) fprintf( file, "returning pinned vector @ %p. It contains %zd elements.\n", out.pinnedVector, out.pinnedVector->nonzeroes() );
+#endif
+	} catch( std::runtime_error &e ){
+#ifdef FILE_LOGGING
+		(void) fprintf( file, "Got exception: %s\n", e.what() );
+		(void) fflush( file );
+#endif
+		out.error_code = grb::PANIC;
+	}
+
+#ifdef FILE_LOGGING
+	(void) fprintf( file, "Exiting grb_program.\n" );
+	(void) fclose( file );
+#endif
 }
 
 /**
@@ -55,7 +111,8 @@ unsigned long get_pr_time() {
  *                      matrix.
  * @param[out] data_out The output pagerank vector.
  */
-void grb_pagerank( const GrB_Input &data_in, GrB_Output &out ) {
+void grb_pagerank_from_file( const pagerank_file_input &data_in, pagerank_output &out ) {
+	set_omp_threads();
 #if !defined NDEBUG || defined FILE_LOGGING
 	const size_t s = grb::spmd<>::pid();
 	const size_t P = grb::spmd<>::nprocs();
@@ -84,14 +141,11 @@ void grb_pagerank( const GrB_Input &data_in, GrB_Output &out ) {
 		}
 	}
 
-#endif
-	assert( data_in.program == PAGERANK_GRB_IO );
-#ifdef FILE_LOGGING
 	(void) fprintf( file, "I will perform a PageRank using GraphBLAS I/O. Filename: %s\n", data_in.data );
 	(void) fflush( file );
 #endif
 	try {
-		grb::utils::MatrixFileReader< void > parser( data_in.data, 1 );
+		grb::utils::MatrixFileReader< void > parser( data_in.infile, true );
 
 		const size_t m = parser.m();
 		const size_t n = parser.n();
@@ -131,49 +185,11 @@ void grb_pagerank( const GrB_Input &data_in, GrB_Output &out ) {
 			);
 #endif
 		}
-		grb::Vector< double > pr( n ), workspace1( n ), workspace2( n ), workspace3( n );
-#ifdef FILE_LOGGING
-		(void) fprintf( file, "Output vector allocated, now passing to PageRank function\n" );
-		(void) fflush( file );
-#endif
-		constexpr double tolerance = 0.0000001;
-		constexpr unsigned maxIters = 80;
-		out.error_code = grb::algorithms::simple_pagerank< grb::descriptors::no_operation >(
-			pr, L,
-			workspace1, workspace2, workspace3,
-			0.85, tolerance, maxIters,
-			&( out.iterations ), &( out.residual )
-		);
-		pr_time = duration_t::zero();
-		for( unsigned i = 0; i < outer_iters; i++ ) {
-			grb::clear( pr );
-			auto start = std::chrono::high_resolution_clock::now();
-			out.error_code = grb::algorithms::simple_pagerank< grb::descriptors::no_operation >(
-				pr, L,
-				workspace1, workspace2, workspace3,
-				0.85, tolerance, maxIters,
-				&( out.iterations ), &( out.residual )
-			);
-			auto end = std::chrono::high_resolution_clock::now();
-			pr_time += ( end - start );
-		}
-		iterations = out.iterations;
+		pagerank_input final( data_in );
+		final.data = &L;
 
-		if( out.error_code != grb::SUCCESS ) {
-			std::string error_code = grb::toString( out.error_code );
-#ifdef FILE_LOGGING
-			(void) fprintf( file, "Call to PageRank failed with error code %s; ", error_code.c_str() );
-#endif
-			return;
-		}
-#ifdef FILE_LOGGING
-		(void) fprintf( file, "Call to PageRank successful; " );
-#endif
-		out.pinnedVector = new grb::PinnedVector< double >( pr, grb::PARALLEL );
-#ifdef FILE_LOGGING
-		(void) fprintf( file, "iters = %zd, residual = %.10e\n", out.iterations, out.residual );
-		(void) fprintf( file, "returning pinned vector @ %p. It contains %zd elements.\n", out.pinnedVector, out.pinnedVector->nonzeroes() );
-#endif
+		do_pagerank( final, out );
+
 	} catch( std::runtime_error &e ){
 #ifdef FILE_LOGGING
 		(void) fprintf( file, "Got exception: %s\n", e.what() );
@@ -183,8 +199,7 @@ void grb_pagerank( const GrB_Input &data_in, GrB_Output &out ) {
 	}
 
 #ifdef FILE_LOGGING
-	(void) fprintf( file, "Exiting grb_program.\n" );
+	(void) fprintf( file, "Exiting grb_pagerank_from_file.\n" );
 	(void) fclose( file );
 #endif
 }
-

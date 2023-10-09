@@ -158,7 +158,7 @@ object MatrixMarketReader {
 	 * @see #readCoordMatrix.
 	 */
 	private def readSymCoordMatrix( sc: SparkContext, fn: String ) : RDDSparseMatrix = {
-		val fnRDD = sc.textFile( fn );
+		val fnRDD = sc.textFile( fn, sc.defaultParallelism );
 		val header = parseHeader( fnRDD );
 		val parsed = filterHeader( fnRDD );
 		val ret = parsed.filter( x => !x.startsWith("%") ).flatMap( parseSymTriple ).groupBy( x => x._1 ).map( x => packTriples(x._1, x._2) )
@@ -177,19 +177,19 @@ object MatrixMarketReader {
 	 *          nonzeroes on that row.
 	 */
 	private def readGenPatternMatrix( sc: SparkContext, fn: String, P: Int = 0 ) : RDD[ (Long, Iterable[Long], Iterable[Double] ) ] = {
-		val file = if(P == 0) sc.textFile(fn) else sc.textFile( fn, P )
+		val file = if(P == 0) sc.textFile(fn, sc.defaultParallelism) else sc.textFile( fn, P )
 		val parsed = filterHeader( file )
 		parsed.filter( x => !x.startsWith( "%" ) ).map( parseTriple ).groupBy( x => x._1 ).map( x => packTriples( x._1, x._2 ) )
 	}
 
 	private def readSymPatternMatrix( sc: SparkContext, fn: String, P: Int = 0 ) : RDD[ (Long, Iterable[Long], Iterable[Double] ) ] = {
-		val file = if(P == 0) sc.textFile( fn ) else sc.textFile( fn, P )
+		val file = if(P == 0) sc.textFile( fn, sc.defaultParallelism ) else sc.textFile( fn, P )
 		val parsed = filterHeader( file )
 		parsed.filter( x => !x.startsWith("%") ).flatMap( parseSymTriple ).groupBy( x => x._1 ).map( x => packTriples( x._1, x._2 ) )
 	}
 
 	private def readPatternMatrix( sc : SparkContext, fn: String, symmetric: Boolean ): RDDSparseMatrix = {
-		val fnRDD = sc.textFile( fn )
+		val fnRDD = sc.textFile( fn, sc.defaultParallelism )
 		val header = parseHeader( fnRDD )
 		val retRDD: RDD[ (Long, Iterable[Long], Iterable[Double]) ] =
 		if( symmetric ) {
@@ -202,27 +202,26 @@ object MatrixMarketReader {
 
 	def readMM( sc: SparkContext, fn: String ) : RDDSparseMatrix = {
 		Using.resource( Source.fromFile( fn ) ) { file => {
-			val file = Source.fromFile( fn )
 			val line = file.getLines().next()
 			if( !line.contains( "MatrixMarket" ) )
-			throw new Exception( "This parser only understands some MatrixMarket formats" )
+				throw new Exception( "This parser only understands some MatrixMarket formats" )
 			if( !line.contains( "matrix" ) )
-			throw new Exception( "Expected a MatrixMarket matrix object" )
+				throw new Exception( "Expected a MatrixMarket matrix object" )
 			if( !line.contains( "coordinate" ) )
-			throw new Exception( "This parser only understands coordinate MatrixMarket formats" )
+				throw new Exception( "This parser only understands coordinate MatrixMarket formats" )
 			if( line.contains( "pattern" ) ) {
-			if( line.contains( "symmetric" ) ) {
-				println( "Symmetric pattern MatrixMarket matrix detected; parsing..." )
-				return readPatternMatrix( sc, fn, true )
-			} else {
-				if( !line.contains( "general" ) )
-				throw new Exception( "This parser only supports symmetric or general (pattern) MatrixMarket formats" )
-				return readPatternMatrix( sc, fn, false )
+				if( line.contains( "symmetric" ) ) {
+					println( "Symmetric pattern MatrixMarket matrix detected; parsing..." )
+					return readPatternMatrix( sc, fn, true )
+				} else {
+					if( !line.contains( "general" ) )
+						throw new Exception( "This parser only supports symmetric or general (pattern) MatrixMarket formats" )
+					return readPatternMatrix( sc, fn, false )
+				}
 			}
-			}
 			if( line.contains( "symmetric" ) ) {
-			println( "Symmetric MatrixMarket matrix detected; parsing..." )
-			return readSymCoordMatrix( sc, fn )
+				println( "Symmetric MatrixMarket matrix detected; parsing..." )
+				return readSymCoordMatrix( sc, fn )
 			} else {
 				if( !line.contains( "general" ) )
 					throw new Exception( "This parser only supports symmetric or general MatrixMarket formats" )
