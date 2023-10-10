@@ -56,11 +56,19 @@ object GraphXPageRank {
     }
 
 	def main( args: Array[String] ): Unit = {
+		if( args.length < 4 ) {
+			println( "Mandatory argument #1: true/false for normalized execution." );
+			println( "Mandatory argument #2: checkpoint directory." );
+			println( "Mandatory argument #3: number of iterations." );
+			println( "One or more matrix files as arguments." );
+			return;
+		}
+
 		val sconf = new SparkConf().setAppName( "PageRank benchmarks" );
 		val sc = new SparkContext( sconf );
-		val chkptdir = args(0);
-                val iters: Int = args(1).toInt;
-                val normalized: Boolean = args(2).toBoolean;
+		val normalized: Boolean = args(0).toBoolean;
+		val chkptdir = args(1);
+		val iters: Int = args(2).toInt;
 		sc.setCheckpointDir( chkptdir );
 		val datafiles = args.drop(3);
 		datafiles.foreach( x => {

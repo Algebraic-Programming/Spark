@@ -30,7 +30,7 @@ import com.huawei.graphblas.PageRank
 import com.huawei.graphblas.PageRankResult
 
 
-object ReadFile {
+object PageRankRDD {
 
 	def main( args: Array[String] ): Unit = {
 		if( args.length != 1 ) {

@@ -30,7 +30,7 @@ import com.huawei.graphblas.PageRank
 import com.huawei.graphblas.PageRankResult
 
 
-object Pagerank {
+object PageRankFile {
 
 	def spark_pr( matrix: org.apache.spark.rdd.RDD[ (Int, Iterable[Int] ) ], iters: Int, cp_freq: Int = 30 ): org.apache.spark.rdd.RDD[ (Int, Double) ] = {
 		var ranks: org.apache.spark.rdd.RDD[ (Int,Double) ] = matrix.map( x => (x._1, 1.0 ) );
@@ -62,27 +62,25 @@ object Pagerank {
 
 
 		println("Now creating GraphBLAS launcher:")
-		Using( new GraphBLAS( sc ) ) { grb => {
+		Using.Manager( use => {
+			val grb = new GraphBLAS( sc )
 			println("====================================")
 			println("  Now running GraphBLAS PageRank")
 			println("====================================")
 
 			val t1 = System.nanoTime()
-			val ( algoTime: Double, maxTime: Double ) = Using(
-				PageRank.runFromFile( grb, filePath ) ) { results: PageRankResult => {
-				val t2 = System.nanoTime()
-				println("====================================")
-				println("    GraphBLAS PageRank completed")
-				println("====================================")
-				val t3 = System.nanoTime()
-				val maxpair = results.max()
-				val t4 = System.nanoTime()
-				println("maximum PageRank entry:")
-				println(maxpair)
-				val t21 = (t2 - t1) / 1000000000.0
-				val t43 = (t4 - t3) / 1000000000.0
-				( t21, t43 )
-			} }.get
+			val results: PageRankResult = use( PageRank.runFromFile( grb, filePath ) )
+			val t2 = System.nanoTime()
+			println("====================================")
+			println("    GraphBLAS PageRank completed")
+			println("====================================")
+			val t3 = System.nanoTime()
+			val maxpair = results.max()
+			val t4 = System.nanoTime()
+			println("maximum PageRank entry:")
+			println(maxpair)
+			val algoTime = (t2 - t1) / 1000000000.0
+			val maxTime = (t4 - t3) / 1000000000.0
 			val ( iters: Long, outer: Long, time: Long ) = grb.getRunStats()
 			val avgTimeSecs = ( time.toDouble / outer.toDouble ) / 1000000000.0
 			println( s"Iterations: $iters, outer iterations: $outer, time per outer iteration: $avgTimeSecs seconds" )
@@ -91,7 +89,7 @@ object Pagerank {
 			println( s"Accelerated PageRank call: $algoTime seconds." )
 			println( s"Max extraction call: $maxTime seconds." )
 			println( s"End-to-end time taken: $time_taken seconds." )
-		} }
+		} )
 	}
 }
 

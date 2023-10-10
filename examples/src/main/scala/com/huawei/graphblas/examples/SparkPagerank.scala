@@ -258,11 +258,11 @@ object SparkPagerank {
 	}
 
 	def main( args: Array[String] ): Unit = {
-		if( args.length < 0 ) {
+		if( args.length < 4 ) {
 			println( "Mandatory argument #1: number of parts input should be divided into." );
 			println( "Mandatory argument #2: checkpoint directory." );
 			println( "Mandatory argument #3: maximum number of iterations." );
-			println( "Program requires a number of processes followed by a list of matrix files as arguments." );
+			println( "One or more matrix files as arguments." );
 			return;
 		}
 

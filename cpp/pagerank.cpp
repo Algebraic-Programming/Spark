@@ -45,7 +45,7 @@ unsigned long get_pr_time() {
 
 void do_pagerank( const pagerank_input &data_in, pagerank_output &out ) {
 
-		set_omp_threads();
+	set_omp_threads();
 	try {
 		const std::size_t n = grb::nrows( *data_in.data );
 		grb::Vector< double > pr( n ), workspace1( n ), workspace2( n ), workspace3( n );

@@ -191,15 +191,18 @@ ${SPARK_HOME}/sbin/start-master.sh
 ${SPARK_HOME}/sbin/start-workers.sh
 ```
 
-Then you can submit ALP/Spark jobs to this master as normal Spark jobs. The
-script `${ALP_SPARK_PATH}/run_examples.sh` contains several examples to be
-selected via the command line, numbered 1 to 5:
+Then you can submit ALP/Spark jobs to this master as normal Spark jobs.
+The script `${ALP_SPARK_PATH}/run_examples.sh` contains several examples to be
+selected via the command line, numbered 1 to 6:
 
 1. initialises the Spark/ALP setup, for debugging purposes
 2. run PageRank in pure Spark implementation
-3. run Pagerank in ALP/Spark implementation
-4. run GraphX Pagerank, uncorrected (i.e., with uncorrect values for dangling nodes)
-5. run GraphX Pagerank, corrected
+3. run Pagerank in ALP/Spark implementation, reading the input file directly
+from ALP
+4. run Pagerank in ALP/Spark implementation, reading the input file in Spark and
+then passing the data to ALP via a normal Spark RDD
+5. run GraphX Pagerank, uncorrected (i.e., with uncorrect values for dangling nodes)
+6. run GraphX Pagerank, corrected
 
 The example matrix used in the script is
 [gyro_m from the SuitSparse Matrix Collection](https://sparse.tamu.edu/Oberwolfach/gyro_m),

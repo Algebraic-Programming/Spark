@@ -1,11 +1,9 @@
 #!/bin/bash
 
 function print_help {
-    echo "usage run_example.sh [<options>...] <example number, 1-5>"
-    echo "--dataset <path to input dataset>"
-    echo "--master_url <URL to Spark master>"
-    echo "--persistence <path to directory for the persistence to Spark RDDs>"
-    echo "--partitions <number of input partitions>"
+    echo "usage run_example.sh [<options>...] <example number, 1-6> <example arguments, if any>..."
+    echo "--master <URL to Spark master>"
+    echo "--help this help"
 }
 
 CDIR="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
@@ -21,17 +19,14 @@ run="no"
 while true; do
   case "$1" in
     --help ) print_help; exit;;
-    --dataset ) dataset="$2"; run="yes"; shift 2;;
     --master ) master_url="$2"; shift 2;;
-    --persistence ) persistence="$2"; shift 2;;
-    --partitions ) partitions="$2"; shift 2;;
-    --iterations ) iterations="$2"; shift 2;;
     --* ) echo "unrecognized option: $1"; exit 1;;
     * ) break ;;
   esac
 done
 
 example_num=$1
+shift 1
 
 re='^[0-9]+$'
 if [[ ! "${example_num}" =~ ${re} ]] ; then
@@ -40,7 +35,8 @@ if [[ ! "${example_num}" =~ ${re} ]] ; then
    exit 1
 fi
 
-if ((example_num < 1 || example_num > 5)); then
+
+if ((example_num < 1 || example_num > 6)); then
     echo "select an example between 1 and 5"
     exit 1
 fi
@@ -61,60 +57,61 @@ case "${example_num}" in
     1)
         run="yes"
         echo "Info: this is a basic check of the ALP/Spark integration. Any given number of iterations is ignored."
-        ARGS="--class com.huawei.graphblas.examples.Initialise ${CDIR}/build/examples.jar"
+        CLASS="Initialise"
         ;;
 # Example 2: run PageRank in pure Spark implementation
     2)
-        if [[ ! -z "${partitions}" && ! -z "${persistence}" && ! -z "${dataset}" ]]; then
+        if [[ "$#" -ge "4" ]]; then
             run="yes"
+            ARGS="$@"
         else
-            dataset="<path to input dataset>"
-            master_url="<URL to Spark master>"
-            persistence="<path to directory for the persistence to Spark RDDs>"
-            partitions="<number of input partitions>"
+            ARGS="<number of input partitions> <path to directory for the persistence to Spark RDDs> <number of iterations> <path to input dataset(s)>"
         fi
+        CLASS="SparkPagerank"
         echo "Info: this is a true PageRank using native Spark RDDs, which runs to convergence OR to the given max. number of iterations ${iterations}."
-        ARGS="--class com.huawei.graphblas.examples.SparkPagerank ${CDIR}/build/examples.jar ${partitions} ${persistence} ${iterations} ${dataset}"
         ;;
 # Example 3: run Pagerank in ALP/Spark implementation
     3)
-        if [[ ! -z "${dataset}" ]]; then
+        if [[ "$#" -ge "1" ]]; then
             run="yes"
+            ARGS="$@"
         else
-            dataset="<path to input dataset>"
-            master_url="<URL to Spark master>"
-            persistence="<path to directory for the persistence to Spark RDDs>"
-            partitions="<number of input partitions>"
+            ARGS="<path to input dataset(s)>"
         fi
+        CLASS="PageRankFile"
         echo "Info: this is a true PageRank using ALP/Spark which runs to convergence. Any given number of iterations is ignored."
-        ARGS="--class com.huawei.graphblas.examples.Pagerank ${CDIR}/build/examples.jar ${dataset}"
+        ;;
+    4)
+        if [[ "$#" -ge "1" ]]; then
+            run="yes"
+            ARGS="$@"
+        else
+            ARGS="<path to input dataset(s)>"
+        fi
+        CLASS="PageRankRDD"
+        echo "Info: this is a true PageRank using ALP/Spark which runs to convergence. Any given number of iterations is ignored."
         ;;
 # Example 4: run GraphX Pagerank, Pregel-variant (PageRank-like), un-normalised
-    4)
-        if [[ ! -z "${persistence}" && ! -z "${dataset}" ]]; then
+    5)
+        if [[ "$#" -ge "3" ]]; then
             run="yes"
+            ARGS="false $@"
         else
-            dataset="<path to input dataset>"
-            master_url="<URL to Spark master>"
-            persistence="<path to directory for the persistence to Spark RDDs>"
-            partitions="<number of input partitions>"
+            ARGS="<path to directory for the persistence to Spark RDDs> <number of iterations> <path to input dataset(s)>"
         fi
-        echo "Info: this is a PageRank-like (Pregel variant) of the Spark GraphX page ranking, which runs for ${iterations} iterations."
-        ARGS="--class com.huawei.graphblas.examples.GraphXPageRank ${CDIR}/build/examples.jar ${persistence} ${iterations} false ${dataset}"
+        CLASS="GraphXPageRank"
+        echo "Info: this is a PageRank-like (Pregel variant) of the Spark GraphX page ranking, which runs for 10 iterations."
         ;;
 # Example 5: run GraphX Pagerank, normalised (still the Pregel variant)
-    5)
-        if [[ ! -z "${persistence}" && ! -z "${dataset}" ]]; then
+    6)
+        if [[ "$#" -ge "3" ]]; then
             run="yes"
+            ARGS="true $@"
         else
-            dataset="<path to input dataset>"
-            master_url="<URL to Spark master>"
-            persistence="<path to directory for the persistence to Spark RDDs>"
-            partitions="<number of input partitions>"
-            iterations="<number of iterations>"
+            ARGS="<path to directory for the persistence to Spark RDDs> <number of iterations> <path to input dataset(s)>"
         fi
-        echo "Info: this is a PageRank-like (Pregel variant, with normalization) of the Spark GraphX page ranking, which runs for ${iterations} iterations."
-        ARGS="--class com.huawei.graphblas.examples.GraphXPageRank ${CDIR}/build/examples.jar ${persistence} ${iterations} true ${dataset}"
+        CLASS="GraphXPageRank"
+        echo "Info: this is a PageRank-like (Pregel variant, with normalization) of the Spark GraphX page ranking, which runs for 10 iterations."
         ;;
     *)
         echo "unknown example number: ${example_num}"
@@ -122,9 +119,9 @@ case "${example_num}" in
         ;;
 esac
 
-CMD="${CMD_BASE} ${ARGS}"
+CMD="${CMD_BASE} --class com.huawei.graphblas.examples.${CLASS} ${CDIR}/build/examples.jar ${ARGS[@]}"
 
-echo "Running: ===>"
+echo "Command: ===>"
 echo ${CMD}
 echo "<==="
 
