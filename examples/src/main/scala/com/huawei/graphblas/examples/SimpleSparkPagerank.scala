@@ -33,15 +33,51 @@ import com.huawei.graphblas.examples.GraphMatrix
 
 object SimpleSparkPagerank {
 
-	def spark_pr( matrix: RDD[ (Long, Iterable[Long] ) ], iters: Int, cp_freq: Int = 30 ): RDD[ (Long, Double) ] = {
-		var ranks: RDD[ (Long, Double) ] = matrix.map( x => (x._1, 1.0 ) );
-		for( i <- 1 to iters ) {
+	def spark_pr( matrix: RDD[ (Long, Iterable[Long] ) ], iters: Int, cp_freq: Int ): RDD[ (Long, Double) ] = {
+		var ranks: RDD[ (Long, Double) ] = matrix.map( x => (x._1, 1.0 ) )
+		var i: Int = 1
+		while( i <= iters ) {
 			if( (i % (cp_freq+1)) == cp_freq ) {
-				ranks.persist();
+				ranks.persist()
 			}
-			ranks = matrix.join(ranks).map( x => x._2 ).flatMap( x => x._1.map( y => (y, 0.15 + 0.85 * x._2) ) ).reduceByKey( _ + _ );
+			ranks = matrix.join(ranks)
+				.flatMap( el => {
+					val x = el._2
+					x._1.map( y => (y, 0.15 + 0.85 * x._2) )
+				}
+			).reduceByKey( _ + _ )
+			i += 1
 		}
-		ranks
+		ranks.persist();
+	}
+
+	def benchmark( matrix: GraphMatrix, iters: Int, cp_freq: Int = 30, num_experiments: Int = 5 ): Unit = {
+
+		val times: Array[Double] = new Array[Double]( num_experiments )
+
+		val time = System.nanoTime()
+		spark_pr(matrix.data, iters, cp_freq ).unpersist()
+		val dry_t1 = (System.nanoTime() - time) / 1000000000.0
+		println( s"Time taken for dry run: $dry_t1 seconds." )
+
+		println( "Performing benchmark of the flop-variant:" )
+		var i = 0
+		while( i < times.size ) {
+			val time: Long = System.nanoTime()
+			val ranks = spark_pr(matrix.data, iters, cp_freq )
+			val checksum = ranks.count()
+			ranks.unpersist()
+			val time_taken: Double = (System.nanoTime() - time) / 1000000000.0
+			times(i) = time_taken
+			println( s" Experiment $i: $time_taken seconds. Checksum: $checksum" )
+			i += 1
+		}
+		val avg_time: Double = times.sum / times.size
+		val sstddev:  Double = sqrt( times.map( x => (x - avg_time) * (x - avg_time) ).sum / (times.size-1) )
+		println( s"Number of runs: ${times.size}." )
+		println( s"Average time taken: ${avg_time} seconds." )
+		println( s"Sample standard deviation: ${sstddev}" )
+		println( s"Number of iterations: ${iters}" )
 	}
 
 	def main( args: Array[String] ): Unit = {
@@ -53,13 +89,12 @@ object SimpleSparkPagerank {
 			return;
 		}
 
-
 		val sconf = new SparkConf().setAppName( "Simple PageRank benchmark" );
 		val sc = new SparkContext( sconf );
 
 		val P = args(0).toInt;
 		val chkptdir = new File( args(1) ).getCanonicalPath();
-		val iters = args(2).toInt;
+		val num_iterations = args(2).toInt;
 		val infile: File = new File( args(3) );
 		if( !infile.exists() || infile.isDirectory()) {
 			println( s"cannot access file ${args(3)}, or is a directory" )
@@ -69,12 +104,12 @@ object SimpleSparkPagerank {
 		println( s"reading from file ${filePath}" )
 
 		sc.setCheckpointDir( chkptdir );
-		val matrix: GraphMatrix = new GraphMatrix( sc, filePath, P, true )
+		val matrix: GraphMatrix = GraphMatrix( sc, filePath, P, true )
 
 		println( s"Pagerank example called with $P parts for matrix and vector segments." );
 		println( s"Pagerank example called using $chkptdir as checkpoint directory." );
 
-		val result = spark_pr( matrix.data, iters )
+		benchmark( matrix, num_iterations )
 	}
 
 }

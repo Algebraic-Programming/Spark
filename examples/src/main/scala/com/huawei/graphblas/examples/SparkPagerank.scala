@@ -70,7 +70,9 @@ object SparkPagerank {
 		val alphainvcontrib: Double = ( 1 - alpha ) / matrix.n;
 		val sinkIDs = sc.broadcast( matrix.sinks.collect() );
 
-		var ranks: RDD[ (Long,Double) ] = sc.range( 0, matrix.n ).map( x => (x, 1.0 / matrix.n) ).partitionBy( matrix.partitioner );
+		val n = matrix.n
+		val partitioner = matrix.partitioner
+		var ranks: RDD[ (Long,Double) ] = sc.range( 0, matrix.n ).map( x => (x, 1.0 / n ) ).partitionBy( partitioner );
 
 		var residual: Double = 1.0;
 
@@ -141,7 +143,7 @@ object SparkPagerank {
 	def benchmark( sc: SparkContext, file: String, P: Int, maxIters: Int ): Unit = {
 
 		var time = System.nanoTime()
-		val matrix: GraphMatrix = new GraphMatrix( sc, file, P, true )
+		val matrix: GraphMatrix = GraphMatrix( sc, file, P, true )
 		val read_time_taken = (System.nanoTime() - time) / 1000000000.0
 		println( s"Time taken for matrix load: $read_time_taken" )
 
