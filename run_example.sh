@@ -35,12 +35,6 @@ if [[ ! "${example_num}" =~ ${re} ]] ; then
    exit 1
 fi
 
-
-if ((example_num < 1 || example_num > 6)); then
-    echo "select an example between 1 and 5"
-    exit 1
-fi
-
 if [[ -z "${master_url}" ]]; then
     master_url="spark://$(hostname):7077"
 fi
@@ -70,7 +64,7 @@ case "${example_num}" in
         CLASS="SparkPagerank"
         echo "Info: this is a true PageRank using native Spark RDDs, which runs to convergence OR to the given max. number of iterations ${iterations}."
         ;;
-# Example 3: run Pagerank in ALP/Spark implementation
+# Example 3: run Pagerank in ALP/Spark implementation, reading te inpit file in ALP (single core, VERY SLOW!!!)
     3)
         if [[ "$#" -ge "1" ]]; then
             run="yes"
@@ -78,9 +72,10 @@ case "${example_num}" in
         else
             ARGS="<path to input dataset(s)>"
         fi
-        CLASS="PageRankFile"
-        echo "Info: this is a true PageRank using ALP/Spark which runs to convergence. Any given number of iterations is ignored."
+        CLASS="ALPPageRankFile"
+        echo "Info: this is a true PageRank using ALP/Spark which runs to convergence. The input file is parsed in ALP single core, and can be VERY SLOW! This option of for testing purposes only."
         ;;
+# Example 4: run Pagerank in ALP/Spark implementation
     4)
         if [[ "$#" -ge "1" ]]; then
             run="yes"
@@ -88,10 +83,10 @@ case "${example_num}" in
         else
             ARGS="<path to input dataset(s)>"
         fi
-        CLASS="PageRankRDD"
-        echo "Info: this is a true PageRank using ALP/Spark which runs to convergence. Any given number of iterations is ignored."
+        CLASS="ALPPageRankRDD"
+        echo "Info: this is a true PageRank using ALP/Spark which runs to convergence. The input file is parsed via Spark in parallel, as in typical user applications."
         ;;
-# Example 4: run GraphX Pagerank, Pregel-variant (PageRank-like), un-normalised
+# Example 5: run GraphX Pagerank, Pregel-variant (PageRank-like), un-normalised
     5)
         if [[ "$#" -ge "3" ]]; then
             run="yes"
@@ -102,7 +97,7 @@ case "${example_num}" in
         CLASS="GraphXPageRank"
         echo "Info: this is a PageRank-like (Pregel variant) of the Spark GraphX page ranking, which runs for 10 iterations."
         ;;
-# Example 5: run GraphX Pagerank, normalised (still the Pregel variant)
+# Example 6: run GraphX Pagerank, normalised (still the Pregel variant)
     6)
         if [[ "$#" -ge "3" ]]; then
             run="yes"
@@ -112,6 +107,17 @@ case "${example_num}" in
         fi
         CLASS="GraphXPageRank"
         echo "Info: this is a PageRank-like (Pregel variant, with normalization) of the Spark GraphX page ranking, which runs for 10 iterations."
+        ;;
+# Example 7: run GraphX Pagerank, normalised (still the Pregel variant)
+    7)
+        if [[ "$#" -ge "4" ]]; then
+            run="yes"
+            ARGS="$@"
+        else
+            ARGS="<number of input partitions (usually number of cores in the cluster)> <path to directory for the persistence to Spark RDDs> <number of iterations (80 to match ALP)> <path to input dataset>"
+        fi
+        CLASS="SimpleSparkPagerank"
+        echo "Info: this is a simple PageRank implementation, with periodic persistance to limit the lineage graph."
         ;;
     *)
         echo "unknown example number: ${example_num}"

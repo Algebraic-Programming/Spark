@@ -207,8 +207,8 @@ JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_pagerankFromGrbMatrix(
 	printf("--->>> invoking do_pagerank\n");
 	fprintf( stderr, "--->>> invoking do_pagerank\n");
 
-	char num_threads_env_var[] = "44";
-	setenv( "OMP_NUM_THREADS", num_threads_env_var, 1 );
+	// char num_threads_env_var[] = "44";
+	// setenv( "OMP_NUM_THREADS", num_threads_env_var, 1 );
 
 	launcher_p->exec( &do_pagerank, in, out, false );
 	if( out.pinnedVector == nullptr ) {

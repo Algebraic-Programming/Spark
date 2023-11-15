@@ -28,17 +28,6 @@ import com.huawei.graphblas.GraphBLAS
 
 object Initialise {
 
-	def spark_pr( matrix: org.apache.spark.rdd.RDD[ (Int, Iterable[Int] ) ], iters: Int, cp_freq: Int = 30 ): org.apache.spark.rdd.RDD[ (Int, Double) ] = {
-		var ranks: org.apache.spark.rdd.RDD[ (Int,Double) ] = matrix.map( x => (x._1, 1.0 ) );
-		for( i <- 1 to iters ) {
-			if( (i % (cp_freq+1)) == cp_freq ) {
-				ranks.persist();
-			}
-			ranks = matrix.join(ranks).map( x => x._2 ).flatMap( x => x._1.map( y => (y, 0.15 + 0.85 * x._2) ) ).reduceByKey( _ + _ );
-		}
-		ranks
-	}
-
 	def main( args: Array[String] ): Unit = {
 		val conf = new SparkConf().setAppName( "Spark GraphBLAS Initialise" )
 
@@ -48,12 +37,12 @@ object Initialise {
 
 		println("Now creating GraphBLAS launcher:")
 		Using( new GraphBLAS( sc ) ) { grb => {
-			println("grb instance contents:")
+			println("GraphBLAS instance contents:")
 			println(grb)
-			// println("GraphBLAS cleaned up.")
 			val time_taken = (System.nanoTime() - t0) / 1000000000.0;
 			println( s"Accelerator time taken: $time_taken." );
 		}}
+		println("GraphBLAS cleaned up.")
 	}
 }
 
