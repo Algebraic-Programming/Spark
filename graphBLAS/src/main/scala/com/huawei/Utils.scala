@@ -26,11 +26,25 @@ package object Utils {
 
 
 	final def getHostname() : String = {
-		InetAddress.getLocalHost().getCanonicalHostName()
+		InetAddress.getLocalHost().toString; //.getCanonicalHostName()
 	}
 
 	final def getHostnameUnique() : String = {
 		getHostname() + "-" + SparkEnv.get.executorId
+	}
+
+	final def computeMean[ T ]( seq: IndexedSeq[ T ] )(implicit num: Numeric[T] ): Double = {
+		num.toDouble( seq.sum[ T ]( num ) ) / seq.length
+	}
+
+	final def computeStdDev[ T ]( seq: IndexedSeq[ T ] )(implicit num: Numeric[T] ): Double = {
+		val mean = computeMean( seq )
+
+		if( seq.length > 1 ) {
+			seq.map( v  => Math.pow( num.toDouble( v ) - mean, 2 ) ).sum / seq.length.toDouble
+		} else {
+			Double.NaN
+		}
 	}
 
 } // end object Utils

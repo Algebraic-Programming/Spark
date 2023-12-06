@@ -138,9 +138,11 @@ public class Native {
 	 *
 	 * Output vectors are freed via a call to #destroyVector.
 	 */
-	public static native long pagerankFromFile( String filename );
+	public static native long pagerankFromFile( String filename,
+		int maxPageRankIteration, double tolerance, int numExperiments );
 
-	public static native long pagerankFromGrbMatrix( long matrix );
+	public static native long pagerankFromGrbMatrix( long matrix,
+		int maxPageRankIteration, double tolerance, int numExperiments );
 
 	/**
 	 * Returns the index of the maximum value in a vector.
@@ -169,8 +171,14 @@ public class Native {
 
 	public static native void exitSequence();
 
-	public static native long getIterations();
 
-	public static native long getTime();
+
+	public static native long getMsTimesPointer();
+	
+	public static native long getMsTimesSize();
+	
+	public static native long getIterationsPointer();
+	
+	public static native long getIterationsSize();
 
 };

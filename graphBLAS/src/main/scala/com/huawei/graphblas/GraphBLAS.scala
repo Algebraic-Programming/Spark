@@ -35,6 +35,8 @@ import com.huawei.RDDSparseMatrix
 
 import com.huawei.graphblas.Native
 import com.huawei.graphblas.PIDMapper
+import com.huawei.graphblas.PerfStats
+import com.huawei.graphblas.PageRankPerfStats
 
 
 class GraphBLAS( val sc: SparkContext ) extends AutoCloseable {
@@ -187,18 +189,32 @@ class GraphBLAS( val sc: SparkContext ) extends AutoCloseable {
 		exit()
 	}
 
-	def getRunStats() : (Long, Long, Long) = {
-		val fun = ( s: Int ) => {
-			val iters: Long = Native.getIterations();
-			val outer: Long = GraphBLAS.outerIterations;
-			val time: Long = Native.getTime();
-			(s, iters, outer, time)
-		}
-		val arr: Array[(Int, Long, Long, Long)] = runDistributed( fun, (-1, 0L, 0L, 0L),
-			( x: (Int, Long, Long, Long ) ) => { x._1 == 0 && x._2 != 0 }
-		)
-		assert( arr.length == 1 )
-		( arr( 0 )._2, arr( 0 )._3, arr( 0 )._4 )
+	// def getRunStats() : (Long, Long, Long) = {
+	// 	val fun = ( s: Int ) => {
+	// 		val iters: Long = Native.getIterations();
+	// 		val outer: Long = GraphBLAS.outerIterations;
+	// 		val time: Long = Native.getTime();
+	// 		(s, iters, outer, time)
+	// 	}
+	// 	val arr: Array[(Int, Long, Long, Long)] = runDistributed( fun, (-1, 0L, 0L, 0L),
+	// 		( x: (Int, Long, Long, Long ) ) => { x._1 == 0 && x._2 != 0 }
+	// 	)
+	// 	assert( arr.length == 1 )
+	// 	( arr( 0 )._2, arr( 0 )._3, arr( 0 )._4 )
+	// }
+
+	private[graphblas] def getLastPerfStats(): PerfStats = {
+		val times: Array[ Double ] = UnsafeUtils.makeDoubleArray( Native.getMsTimesPointer(), Native.getMsTimesSize() )
+		new PerfStats( times.toIndexedSeq )
+	}
+
+	private[graphblas] def getLastPageRankPerfStats(): PageRankPerfStats = {
+		val times: Array[ Double ] = UnsafeUtils.makeDoubleArray(
+			Native.getMsTimesPointer(), Native.getMsTimesSize() )
+		val iterations: Array[ Int ] = UnsafeUtils.makeIntArray(
+			Native.getIterationsPointer(), Native.getIterationsSize() )
+
+		new PageRankPerfStats( times.toIndexedSeq, iterations.toIndexedSeq )
 	}
 }
 

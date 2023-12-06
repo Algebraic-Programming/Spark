@@ -6,9 +6,12 @@ import org.apache.spark.rdd.RDD
 
 import com.huawei.graphblas.GraphBLAS
 import com.huawei.graphblas.Native
+import com.huawei.graphblas.PageRankParameters
+import com.huawei.graphblas.PageRankPerfStats
 
 
-final class PageRankResult( private val grb: GraphBLAS, val vector: RDD[ Long ] ) extends AutoCloseable {
+final class PageRankResult( private val grb: GraphBLAS, val vector: RDD[ Long ],
+	val perfStats: PageRankPerfStats ) extends AutoCloseable {
 
 	var active = true
 
@@ -32,7 +35,7 @@ final class PageRankResult( private val grb: GraphBLAS, val vector: RDD[ Long ] 
 		active = false
 	}
 
-		/**
+	/**
 	 * Retrieves the maximum value and its index from a given vector.
 	 *
 	 * @param[in,out] sc   The Spark context.

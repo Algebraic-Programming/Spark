@@ -1,21 +1,23 @@
+
 package com.huawei.graphblas
 
 import com.huawei.graphblas.Native
 import com.huawei.graphblas.GraphBLASMatrix
 import com.huawei.graphblas.PageRankResult
+import com.huawei.graphblas.PageRankParameters
 
 
 object PageRank {
 
-	def runFromMatrix( matrix: GraphBLASMatrix ): PageRankResult = {
-
+	def runFromMatrix( matrix: GraphBLASMatrix, params: PageRankParameters ): PageRankResult = {
 		val results = matrix.grbMatAddresses.map( ( matrix: Long ) => {
 			if( matrix != 0L ) {
-				Native.pagerankFromGrbMatrix( matrix )
+				Native.pagerankFromGrbMatrix( matrix, params.maxPageRankIteration,
+					params.tolerance, params.numExperiments )
 			} else 0L
 		}
 		).persist()
-		new PageRankResult( matrix.grb, results )
+		new PageRankResult( matrix.grb, results, matrix.grb.getLastPageRankPerfStats() )
 	}
 
 
@@ -30,14 +32,14 @@ object PageRank {
 	 *
 	 * @returns A handle to the distributed PageRank vector.
 	 */
-	def runFromFile( grb: GraphBLAS, filename: String ) : PageRankResult = {
+	def runFromFile( grb: GraphBLAS, filename: String, params: PageRankParameters ) : PageRankResult = {
 		val fun = ( s: Int ) => {
-			val ret = Native.pagerankFromFile( filename )
+			val ret = Native.pagerankFromFile( filename, params.maxPageRankIteration, params.tolerance, params.numExperiments )
 			(s, ret)
 		}
 		val filter = ( x: (Int, Long) ) => x._1 != -1
 		val arr = grb.runDistributedRdd( fun, (-1, 0L), filter, true )
 		println( "Collected data instances per node:" )
-		new PageRankResult( grb, arr.map( p => p._2 ) )
+		new PageRankResult( grb, arr.map( p => p._2 ), grb.getLastPageRankPerfStats() )
 	}
 }

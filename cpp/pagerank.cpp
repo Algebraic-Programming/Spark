@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include <chrono>
 #include <limits>
+#include <vector>
 
 #include "graphblas/algorithms/simple_pagerank.hpp"
 #include "graphblas/utils/parser/MatrixFileReader.hpp"
@@ -28,20 +29,47 @@
 #include "pagerank.hpp"
 
 
-unsigned outer_iters = 5;
+// unsigned outer_iters = 5;
 using duration_t = std::chrono::time_point<std::chrono::high_resolution_clock>::duration;
-static duration_t pr_time = duration_t::zero();
-size_t iterations;
+// static duration_t pr_time = duration_t::zero();
+// size_t iterations;
 
-size_t get_pr_inner_iterations() {
-	return iterations;
+// size_t get_pr_inner_iterations() {
+// 	return iterations;
+// }
+
+// unsigned long get_pr_time() {
+// 	return static_cast< unsigned long >(
+// 		std::chrono::duration_cast<std::chrono::nanoseconds>( pr_time ).count()
+// 	);
+// }
+
+
+
+static std::vector< double > ms_times;
+
+double* get_ms_times_pointer() {
+	return ms_times.data();
 }
 
-unsigned long get_pr_time() {
-	return static_cast< unsigned long >(
-		std::chrono::duration_cast<std::chrono::nanoseconds>( pr_time ).count()
-	);
+size_t get_ms_times_size() {
+	return ms_times.size();
 }
+
+
+static std::vector< unsigned > iterations;
+
+unsigned* get_iterations_pointer() {
+	return iterations.data();
+}
+
+size_t get_iterations_size() {
+	return iterations.size();
+}
+
+
+
+
 
 void do_pagerank( const pagerank_input &data_in, pagerank_output &out ) {
 
@@ -59,7 +87,9 @@ void do_pagerank( const pagerank_input &data_in, pagerank_output &out ) {
 			/*0.85*/ data_in.alpha, data_in.tolerance, data_in.max_iterations,
 			&( out.iterations ), &( out.residual )
 		);
-		pr_time = duration_t::zero();
+		// duration_t pr_time = duration_t::zero();
+		ms_times.clear();
+		iterations.clear();
 		for( unsigned i = 0; i < data_in.outer_iters; i++ ) {
 			grb::clear( pr );
 			auto start = std::chrono::high_resolution_clock::now();
@@ -70,9 +100,11 @@ void do_pagerank( const pagerank_input &data_in, pagerank_output &out ) {
 				&( out.iterations ), &( out.residual )
 			);
 			auto end = std::chrono::high_resolution_clock::now();
-			pr_time += ( end - start );
+			// duration_t pr_time = ( end - start );
+			ms_times.push_back( std::chrono::duration_cast< std::chrono::duration< double, std::milli > >( end - start ).count() );
+			iterations.push_back( out.iterations );
 		}
-		iterations = out.iterations;
+
 
 		if( out.error_code != grb::SUCCESS ) {
 			std::string error_code = grb::toString( out.error_code );

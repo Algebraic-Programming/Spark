@@ -28,43 +28,35 @@ import com.huawei.MatrixMarketReader
 import com.huawei.graphblas.GraphBLASMatrix
 import com.huawei.graphblas.PageRank
 import com.huawei.graphblas.PageRankResult
+import com.huawei.graphblas.examples.cmdargs.PageRankArgs
+import com.huawei.graphblas.PageRankParameters
+import com.huawei.graphblas.PageRankPerfStats
 
 
 object ALPPageRankRDD {
 
 	def main( args: Array[String] ): Unit = {
-		if( args.length != 1 ) {
-			println( "Usage: ./program_name <matrix file>." );
-			return;
-		}
+
+		val prargs = new PageRankArgs( args.toIndexedSeq )
+
 		val conf = new SparkConf().setAppName( "Spark GraphBLAS Pagerank ReadFile" )
 		val sc = new SparkContext( conf );
 
-		val infile: File = new File( args(0) );
-		if( !infile.exists() || infile.isDirectory()) {
-			println( s"cannot access file ${args(0)}, or is a directory" )
-			return
-		}
-		val filePath = infile.getCanonicalPath()
-		println( s"reading from file ${filePath}" )
+		val filePath = prargs.getInputFilePath()
 
+		println( s"reading from file ${filePath}" )
 
 		println("Now creating GraphBLAS launcher:")
 
-		val ( iters: Long, outer: Long, time: Long ) =
 		Using.Manager( use => {
 			val grb = use( new GraphBLAS( sc ) )
 			val matrix = MatrixMarketReader.readMM( sc, filePath )
 			println( s"--->>>> number of partitions ${matrix.data.getNumPartitions}" )
-			val grbMat = use(  GraphBLASMatrix.createMatrixFromRDD( grb, matrix, true ) )
-			val results = use( PageRank.runFromMatrix( grbMat ) )
-			val maxpair = results.max()
-			println("maximum PageRank entry:")
-			println(maxpair)
-			grb.getRunStats()
-		} ).get
-		val avgTimeSecs = ( time.toDouble / outer.toDouble ) / 1000000000.0
-		println( s"Iterations: $iters, outer iterations: $outer, time per outer iteration: $avgTimeSecs seconds" )
+			val grbMat = use( GraphBLASMatrix.createMatrixFromRDD( grb, matrix, true ) )
+			val results = use( PageRank.runFromMatrix( grbMat, prargs.makePageRankParameters() ) )
+			println( s"maximum PageRank entry: ${results.max()}" )
+			results.perfStats
+		} ).get.printStats()
 	}
 }
 

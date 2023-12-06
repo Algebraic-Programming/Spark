@@ -119,7 +119,10 @@ JNIEXPORT void JNICALL Java_com_huawei_graphblas_Native_end( JNIEnv *, jclass, j
 JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_pagerankFromFile(
 		JNIEnv * env,
 		jclass,
-		jstring filename
+		jstring filename,
+		jint maxPageRankIteration,
+		jdouble tolerance,
+		jint numExperiments
 ) {
 	const char * const cfn = env->GetStringUTFChars( filename, NULL );
 
@@ -144,6 +147,10 @@ JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_pagerankFromFile(
 
 	// prepare input
 	pagerank_file_input in;
+	in.tolerance = static_cast< double >( tolerance );
+	in.max_iterations = static_cast< unsigned >( maxPageRankIteration );
+	in.outer_iters = static_cast< unsigned >( numExperiments );
+	in.alpha = 0.85;
 	size_t cfn_size = strlen( cfn );
 	if( cfn_size > pagerank_file_input::STR_SIZE ) {
 		cfn_size = pagerank_file_input::STR_SIZE;
@@ -193,7 +200,10 @@ JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_pagerankFromFile(
 JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_pagerankFromGrbMatrix(
 		JNIEnv *,
 		jclass,
-		jlong matrix
+		jlong matrix,
+		jint maxPageRankIteration,
+		jdouble tolerance,
+		jint numExperiments
 ) {
 	if( grb_instance == nullptr ) {
 		throw std::runtime_error( "instance not valid" );
@@ -202,6 +212,10 @@ JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_pagerankFromGrbMatrix(
 	grb::Matrix< void > * mat = reinterpret_cast< grb::Matrix< void > * >( matrix ) ;
 	pagerank_input in;
 	in.data = mat;
+	in.tolerance = static_cast< double >( tolerance );
+	in.max_iterations = static_cast< unsigned >( maxPageRankIteration );
+	in.outer_iters = static_cast< unsigned >( numExperiments );
+	in.alpha = 0.85;
 
 	pagerank_output out;
 	printf("--->>> invoking do_pagerank\n");
@@ -437,18 +451,28 @@ JNIEXPORT jboolean JNICALL Java_com_huawei_graphblas_Native_enterSequence(
 }
 
 JNIEXPORT void JNICALL Java_com_huawei_graphblas_Native_exitSequence(
-	JNIEnv * env, jclass classDef
+	JNIEnv *, jclass
 ) {
-	(void) env;
-	(void) classDef;
-
 	already_initialized.store( false );
 }
 
-JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_getIterations(JNIEnv *, jclass) {
-	return static_cast< jlong >( get_pr_inner_iterations() );
+
+double* get_ms_times_pointer();
+JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_getMsTimesPointer(JNIEnv *, jclass) {
+	return reinterpret_cast< jlong >( get_ms_times_pointer() );
 }
 
-JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_getTime(JNIEnv *, jclass) {
-	return static_cast< jlong >( get_pr_time() );
+size_t get_ms_times_size();
+JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_getMsTimesSize(JNIEnv *, jclass) {
+	return static_cast< jlong >( get_ms_times_size() );
+}
+
+unsigned* get_iterations_pointer();
+JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_getIterationsPointer(JNIEnv *, jclass) {
+	return reinterpret_cast< jlong >( get_iterations_pointer() );
+}
+
+size_t get_iterations_size();
+JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_getIterationsSize(JNIEnv *, jclass) {
+	return static_cast< jlong >( get_iterations_size() );
 }

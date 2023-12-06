@@ -9,7 +9,9 @@ val shared = Seq(
 	libraryDependencies += "org.apache.spark" %% "spark-graphx" % "3.4.0" % "provided",
 	// libraryDependencies += "com.github.scopt" %% "scopt" % "4.1.0",
 	scalacOptions ++= Seq("-deprecation", "-feature"),
-	Compile/packageBin/artifactPath := baseDirectory.value / ".." / "build" / (name.value + ".jar")
+	Compile/packageBin/artifactPath := baseDirectory.value / ".." / "build" / (name.value + ".jar"),
+	assemblyPackageScala / assembleArtifact := false,
+	assembly / assemblyOutputPath := file( s"${baseDirectory.value}/../build/${(assembly/assemblyJarName).value}" )
 )
 
 val source: File = file(".")
@@ -23,7 +25,8 @@ lazy val graphBLAS = (project in file("graphBLAS"))
 lazy val examples = (project in file("examples"))
 	.settings(
 		shared,
-		name := "examples"
+		name := "examples",
+		libraryDependencies += "org.rogach" %% "scallop" % "5.0.1"
   	)
 	.dependsOn(graphBLAS)
 

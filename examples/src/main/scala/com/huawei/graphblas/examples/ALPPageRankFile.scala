@@ -28,25 +28,20 @@ import com.huawei.Utils
 import com.huawei.graphblas.GraphBLAS
 import com.huawei.graphblas.PageRank
 import com.huawei.graphblas.PageRankResult
+import com.huawei.graphblas.examples.cmdargs.PageRankArgs
 
 
 object ALPPageRankFile {
 
 	def main( args: Array[String] ): Unit = {
-		if( args.length != 1 ) {
-			println( "Usage: ./program_name <matrix file>." );
-			return;
-		}
+
+		val prargs = new PageRankArgs( args.toIndexedSeq )
+
 		val conf = new SparkConf().setAppName( "ALP-Spark GraphBLAS Pagerank from file" )
 		val sc = new SparkContext( conf );
 
 		val t0 = System.nanoTime()
-		val infile: File = new File( args(0) );
-		if( !infile.exists() || infile.isDirectory()) {
-			println( s"cannot access file ${args(0)}, or is a directory" )
-			return
-		}
-		val filePath = infile.getCanonicalPath()
+		val filePath = prargs.getInputFilePath()
 		println( s"reading from file ${filePath}" )
 
 
@@ -58,27 +53,14 @@ object ALPPageRankFile {
 			println("====================================")
 
 			val t1 = System.nanoTime()
-			val results: PageRankResult = use( PageRank.runFromFile( grb, filePath ) )
+			val results: PageRankResult = use( PageRank.runFromFile( grb, filePath, prargs.makePageRankParameters() ) )
 			val t2 = System.nanoTime()
 			println("====================================")
 			println("    GraphBLAS PageRank completed")
 			println("====================================")
-			val t3 = System.nanoTime()
-			val maxpair = results.max()
-			val t4 = System.nanoTime()
-			println("maximum PageRank entry:")
-			println(maxpair)
-			val algoTime = (t2 - t1) / 1000000000.0
-			val maxTime = (t4 - t3) / 1000000000.0
-			val ( iters: Long, outer: Long, time: Long ) = grb.getRunStats()
-			val avgTimeSecs = ( time.toDouble / outer.toDouble ) / 1000000000.0
-			println( s"Iterations: $iters, outer iterations: $outer, time per outer iteration: $avgTimeSecs seconds" )
-			println("GraphBLAS cleaned up.")
-			val time_taken = (System.nanoTime() - t0) / 1000000000.0
-			println( s"Accelerated PageRank call: $algoTime seconds." )
-			println( s"Max extraction call: $maxTime seconds." )
-			println( s"End-to-end time taken: $time_taken seconds." )
-		} )
+			println( s"maximum PageRank entry: ${results.max()}" )
+			results.perfStats
+		} ).get.printStats()
 	}
 }
 
