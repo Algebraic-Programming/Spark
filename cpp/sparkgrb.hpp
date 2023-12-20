@@ -83,8 +83,6 @@ struct pagerank_output {
 	pagerank_output( const pagerank_output & ) = delete;
 };
 
-void set_omp_threads();
-
 void do_pagerank( const pagerank_input &, pagerank_output & );
 
 void grb_pagerank_from_file( const pagerank_file_input &, pagerank_output & );

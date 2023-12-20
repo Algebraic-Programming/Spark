@@ -22,10 +22,6 @@ package com.huawei.graphblas;
 /** Collects the native interface into the GraphBLAS. */
 public class Native {
 
-	static {
-		System.loadLibrary( "sparkgrb" );
-	}
-
 	/**
 	 * Initialises the GraphBLAS back-end.
 	 *
@@ -41,16 +37,19 @@ public class Native {
 	 * @returns An instance pointer used to start GraphBLAS programs.
 	 */
 	public static long begin( String master, int s, int P, int threads ) throws Exception {
-		System.out.println("number of processes: " + Runtime.getRuntime().availableProcessors() );
+
+		System.loadLibrary( "grbinit" );
+		setThreads( threads );
+
+		System.loadLibrary( "sparkgrb" );
 		boolean isMain = Native.enterSequence();
 		if( isMain ) {
-			System.out.println("initialization for node " + s );
-			return Native.start( master, s, P, threads );
+			return Native.start( master, s, P );
 		} else return 0L;
 	}
 
 	/** @see #begin -- this implements the native part of its functionality. */
-	private static native long start( String master, int s, int P, int threads );
+	private static native long start( String master, int s, int P );
 
 	/**
 	 * Finalises the current GraphBLAS context.
@@ -174,11 +173,12 @@ public class Native {
 
 
 	public static native long getMsTimesPointer();
-	
+
 	public static native long getMsTimesSize();
-	
+
 	public static native long getIterationsPointer();
-	
+
 	public static native long getIterationsSize();
 
+	public static native void setThreads( int threads );
 };

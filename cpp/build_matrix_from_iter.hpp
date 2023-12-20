@@ -17,7 +17,6 @@ build_matrix_from_iterator(
 	const build_params< RowT, ColT > &pars,
 	grb::Matrix< ValT >* &ret
 ) {
-	set_omp_threads();
 	grb::Matrix< ValT > * const _ret = new grb::Matrix< ValT >( pars.rows, pars.cols );
 	entry_iterator< RowT, ColT > start( pars.ingestion.get_begin() ),
 		end( pars.ingestion.get_end() );

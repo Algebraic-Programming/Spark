@@ -85,9 +85,6 @@ class GraphBLAS( val sc: SparkContext ) extends AutoCloseable {
 	private def terminateSequence( log: Boolean = false ): Unit = {
 		val rdd = distributed_rdd.map {
 			node => {
-				// if( log ) {
-				println( "terminating..." )
-				// }
 				Native.exitSequence();
 				node
 			}
@@ -112,9 +109,6 @@ class GraphBLAS( val sc: SparkContext ) extends AutoCloseable {
 				val hostname: String = Utils.getHostnameUnique();
 				val s: Int = bcm.value.processID( hostname );
 				val canEnter = Native.enterSequence()
-				if( canEnter ) {
-					println( s"--------->>>>>>>>> hostname is ${hostname}" )
-				}
 				( if ( canEnter ) 1 else 0, if ( canEnter ) fun( s ) else defValue )
 			}
 		}.persist()
@@ -122,7 +116,6 @@ class GraphBLAS( val sc: SparkContext ) extends AutoCloseable {
 
 		if( log ) {
 			val entered = ret1.map( x => x._1 ).reduce( ( a, b ) => { a + b } )
-			println( s"--------->>>>>>>>> entered is ${entered}" )
 		}
 
 		val user_vals = ret1.map( x => x._2 )
@@ -189,32 +182,30 @@ class GraphBLAS( val sc: SparkContext ) extends AutoCloseable {
 		exit()
 	}
 
-	// def getRunStats() : (Long, Long, Long) = {
-	// 	val fun = ( s: Int ) => {
-	// 		val iters: Long = Native.getIterations();
-	// 		val outer: Long = GraphBLAS.outerIterations;
-	// 		val time: Long = Native.getTime();
-	// 		(s, iters, outer, time)
-	// 	}
-	// 	val arr: Array[(Int, Long, Long, Long)] = runDistributed( fun, (-1, 0L, 0L, 0L),
-	// 		( x: (Int, Long, Long, Long ) ) => { x._1 == 0 && x._2 != 0 }
-	// 	)
-	// 	assert( arr.length == 1 )
-	// 	( arr( 0 )._2, arr( 0 )._3, arr( 0 )._4 )
-	// }
-
 	private[graphblas] def getLastPerfStats(): PerfStats = {
 		val times: Array[ Double ] = UnsafeUtils.makeDoubleArray( Native.getMsTimesPointer(), Native.getMsTimesSize() )
 		new PerfStats( times.toIndexedSeq )
 	}
 
 	private[graphblas] def getLastPageRankPerfStats(): PageRankPerfStats = {
-		val times: Array[ Double ] = UnsafeUtils.makeDoubleArray(
-			Native.getMsTimesPointer(), Native.getMsTimesSize() )
-		val iterations: Array[ Int ] = UnsafeUtils.makeIntArray(
-			Native.getIterationsPointer(), Native.getIterationsSize() )
 
-		new PageRankPerfStats( times.toIndexedSeq, iterations.toIndexedSeq )
+		val fun = ( p:Int ) => {
+			val times: Array[ Double ] = UnsafeUtils.makeDoubleArray(
+				Native.getMsTimesPointer(), Native.getMsTimesSize() )
+			val iterations: Array[ Int ] = UnsafeUtils.makeIntArray(
+				Native.getIterationsPointer(), Native.getIterationsSize() )
+
+			( p, times, iterations )
+		}
+
+		val filter = ( v: (Int, Array[ Double ], Array[ Int ]) ) => { v._1 == 0 }
+
+		println( "############# getting perf stata" )
+		val vals = runDistributed( fun, ( -1, Array[ Double ](), Array[ Int ]() ), filter )
+
+		assert( vals.length == 1 )
+
+		new PageRankPerfStats( vals( 0 )._2.toIndexedSeq, vals( 0 )._3.toIndexedSeq )
 	}
 }
 

@@ -17,6 +17,7 @@ object PageRank {
 			} else 0L
 		}
 		).persist()
+		assert( results.count() > 0 )
 		new PageRankResult( matrix.grb, results, matrix.grb.getLastPageRankPerfStats() )
 	}
 

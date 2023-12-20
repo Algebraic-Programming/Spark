@@ -19,6 +19,7 @@ package com.huawei
 import java.net.InetAddress
 import sun.misc.Unsafe
 import java.lang.reflect.Field
+import java.lang.Math
 
 import org.apache.spark.SparkEnv
 
@@ -26,7 +27,8 @@ package object Utils {
 
 
 	final def getHostname() : String = {
-		InetAddress.getLocalHost().toString; //.getCanonicalHostName()
+		// InetAddress.getLocalHost().getCanonicalHostName()
+		InetAddress.getLocalHost().getHostAddress()
 	}
 
 	final def getHostnameUnique() : String = {
@@ -41,7 +43,8 @@ package object Utils {
 		val mean = computeMean( seq )
 
 		if( seq.length > 1 ) {
-			seq.map( v  => Math.pow( num.toDouble( v ) - mean, 2 ) ).sum / seq.length.toDouble
+			val dev = seq.map( v  => Math.pow( num.toDouble( v ) - mean, 2 ) ).sum
+			Math.sqrt( dev / ( seq.length.toDouble - 1) )
 		} else {
 			Double.NaN
 		}

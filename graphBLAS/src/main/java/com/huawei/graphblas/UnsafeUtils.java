@@ -2,6 +2,7 @@ package com.huawei.graphblas;
 
 import sun.misc.Unsafe;
 import java.lang.reflect.Field;
+import java.util.Arrays;
 
 class UnsafeUtils {
 
@@ -18,7 +19,7 @@ class UnsafeUtils {
 	}
 
 	private static long DOUBLE_SIZE = 8;
-	private static long INT_SIZE = 8;
+	private static long INT_SIZE = 4;
 
 	public static double[] makeDoubleArray( long initAddr, long size ) {
 		double[] res = new double[(int)size];
@@ -32,7 +33,8 @@ class UnsafeUtils {
 	}
 
 	public static int[] makeIntArray( long initAddr, long size ) {
-		int[] res = new int[(int)size];
+		int[] res = new int[ (int)size ];
+		Arrays.fill( res, 0 );
 
 		Unsafe un = getTheUnsafe();
 		for(int i = 0; i < size; i++) {

@@ -19,7 +19,7 @@ include config.conf
 
 .PHONY: all clean install package_jars cpp_clean emit_config
 
-all: cpp_lib package_jars lpf_java_launcher emit_config
+all: cpp_lib package_jars lpf_java_launcher emit_config assemble_jars
 
 GRBCXX=$(GRB_INSTALL_PATH)/bin/grbcxx
 
@@ -64,7 +64,13 @@ build/libsparkgrb.so: build/native.o build/pagerank.o
 	# The following is bugged:
 	#${CXX} -shared -o "${@}" ${^}
 
-cpp_lib: build/libsparkgrb.so
+build/grbinit.o: cpp/grbinit.cpp
+	${CXX} ${CPPFLAGS} -fPIC -Ibuild/ -I${GRB_INSTALL_PATH}/include/:./cpp/ -c -o "$@" "$<"
+
+build/libgrbinit.so: build/grbinit.o
+	${PREFIX} -shared -o "${@}" ${^} ${MPOSTFIX}
+
+cpp_lib: build/libsparkgrb.so build/libgrbinit.so
 
 cpp_clean:
 	@rm -rf build/libsparkgrb.so build/*.o || true &> /dev/null
