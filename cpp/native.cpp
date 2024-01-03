@@ -94,7 +94,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_pagerankFromFile(
 		JNIEnv * env,
 		jclass,
 		jstring filename,
-		jint maxPageRankIteration,
+		jint maxPageRankIterations,
 		jdouble tolerance,
 		jint numExperiments
 ) {
@@ -115,7 +115,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_pagerankFromFile(
 	// prepare input
 	pagerank_file_input in;
 	in.tolerance = static_cast< double >( tolerance );
-	in.max_iterations = static_cast< unsigned >( maxPageRankIteration );
+	in.max_iterations = static_cast< unsigned >( maxPageRankIterations );
 	in.outer_iters = static_cast< unsigned >( numExperiments );
 	in.alpha = 0.85;
 	size_t cfn_size = strlen( cfn );
@@ -158,7 +158,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_pagerankFromGrbMatrix(
 		JNIEnv *,
 		jclass,
 		jlong matrix,
-		jint maxPageRankIteration,
+		jint maxPageRankIterations,
 		jdouble tolerance,
 		jint numExperiments
 ) {
@@ -170,7 +170,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_graphblas_Native_pagerankFromGrbMatrix(
 	pagerank_input in;
 	in.data = mat;
 	in.tolerance = static_cast< double >( tolerance );
-	in.max_iterations = static_cast< unsigned >( maxPageRankIteration );
+	in.max_iterations = static_cast< unsigned >( maxPageRankIterations );
 	in.outer_iters = static_cast< unsigned >( numExperiments );
 	in.alpha = 0.85;
 

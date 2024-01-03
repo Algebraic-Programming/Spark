@@ -1,4 +1,4 @@
 
 package com.huawei.graphblas
 
-final case class PageRankParameters( val maxPageRankIteration: Int, val tolerance: Double, val numExperiments: Int )
+final case class PageRankParameters( val maxPageRankIterations: Int, val tolerance: Double, val numExperiments: Int )

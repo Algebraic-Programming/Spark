@@ -138,10 +138,10 @@ public class Native {
 	 * Output vectors are freed via a call to #destroyVector.
 	 */
 	public static native long pagerankFromFile( String filename,
-		int maxPageRankIteration, double tolerance, int numExperiments );
+		int maxPageRankIterations, double tolerance, int numExperiments );
 
 	public static native long pagerankFromGrbMatrix( long matrix,
-		int maxPageRankIteration, double tolerance, int numExperiments );
+		int maxPageRankIterations, double tolerance, int numExperiments );
 
 	/**
 	 * Returns the index of the maximum value in a vector.

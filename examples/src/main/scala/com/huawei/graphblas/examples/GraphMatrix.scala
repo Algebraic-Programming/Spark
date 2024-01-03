@@ -75,7 +75,7 @@ object GraphMatrix {
 			println( s"Pure read IO time taken: $time_taken seconds." )
 			_nlines
 		} else 0L
-		var data: RDD[ (Long,Iterable[Long]) ] =
+		var data: RDD[ (Long, Iterable[Long]) ] =
 			filtered.map( x => {                               //x is a bunch of strings where each line is formatted as "i,j,v" or "i,j"
 				val line = x.split( sep )                 //create a 2 or 3 tuple
 				assert( line.size == 2 || line.size == 3 )

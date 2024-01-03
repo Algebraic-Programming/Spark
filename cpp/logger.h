@@ -23,10 +23,6 @@ TRACE
 #define __DEBUG_LEVEL 5
 #define __TRACE_LEVEL 6
 
-#define __JOIN( x, y ) __JOIN_AGAIN( x, y )
-#define __JOIN_AGAIN( x, y ) x ## y
-
-
 #ifndef LOG_LEVEL
 	// #define LOG_LEVEL __WARNING_LEVEL
 	#define LOG_LEVEL __INFO_LEVEL

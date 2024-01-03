@@ -108,11 +108,10 @@ object GraphBLASMatrix {
 			}, 0L
 		).persist()
 
-		rdd.collect().foreach( el => {
-			println( s"   --->>> element is ${el}" )
-		}
-
-		)
+		// rdd.collect().foreach( el => {
+		// 	println( s"   --->>> element is ${el}" )
+		// }
+		// )
 
 		if( log ) {
 			println( "-->>> cleaning ingestion data" )

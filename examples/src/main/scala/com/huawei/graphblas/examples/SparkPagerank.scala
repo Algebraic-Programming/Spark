@@ -28,8 +28,8 @@ import org.apache.spark.SparkContext
 import org.apache.spark.storage.StorageLevel._
 
 import com.huawei.Utils
-
 import com.huawei.graphblas.examples.GraphMatrix
+import com.huawei.graphblas.examples.cmdargs.PartitionedPageRankArgs
 
 object SparkPagerank {
 
@@ -173,36 +173,24 @@ object SparkPagerank {
 	}
 
 	def main( args: Array[String] ): Unit = {
-		if( args.length < 4 ) {
-			println( "Mandatory argument #1: number of parts input should be divided into." );
-			println( "Mandatory argument #2: checkpoint directory." );
-			println( "Mandatory argument #3: maximum number of iterations." );
-			println( "One or more matrix files as arguments." );
-			return;
-		}
-
+		val prargs = new PartitionedPageRankArgs( args.toIndexedSeq )
 
 		val sconf = new SparkConf().setAppName( "PageRank benchmarks" );
 		val sc = new SparkContext( sconf );
 
-		val P = args(0).toInt;
-		val chkptdir = args(1);
-		val iters = args(2).toInt;
+		println( s"Pagerank example called with ${prargs.maxPageRankIterations()} parts for matrix and vector segments." );
+		println( s"Pagerank example called using ${prargs.persistenceDirectory()} as checkpoint directory." );
 
-		println( s"Pagerank example called with $P parts for matrix and vector segments." );
-		println( s"Pagerank example called using $chkptdir as checkpoint directory." );
+		sc.setCheckpointDir( prargs.persistenceDirectory() );
 
-		sc.setCheckpointDir( chkptdir );
+		// val hostnames = sc.parallelize( 0 until prargs.numPartitions() ).map{ pid => {Utils.getHostname()} }.collect().toArray
+		// val mapper = new com.huawei.graphblas.PIDMapper( sc.parallelize( 0 until prargs.numPartitions() ).map{ pid => {Utils.getHostname()} }.collect().toArray, null ) // change me!!!!!!!!!
+		// val nodes = mapper.numProcesses()
+		// println( s"I detected $nodes individual worker nodes." );
 
-		val hostnames = sc.parallelize( 0 until P ).map{ pid => {Utils.getHostname()} }.collect().toArray
-		val mapper = new com.huawei.graphblas.PIDMapper( sc.parallelize( 0 until P ).map{ pid => {Utils.getHostname()} }.collect().toArray, null ) // change me!!!!!!!!!
-		val nodes = mapper.numProcesses()
-		println( s"I detected $nodes individual worker nodes." );
-
-		val datafiles = args.drop(3);
-		datafiles.foreach( x => {
-			println( s"Starting benchmark using $x" );
-			benchmark( sc, x, P, iters );
+		prargs.forEachInputFile( x => {
+			println( s"Starting benchmark using ${x}" );
+			benchmark( sc, x, prargs.numPartitions(), prargs.maxPageRankIterations() );
 		} );
 	}
 

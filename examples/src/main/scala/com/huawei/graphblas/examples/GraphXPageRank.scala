@@ -25,6 +25,7 @@ import org.apache.spark.SparkConf
 import org.apache.spark.SparkContext
 
 import com.huawei.MatrixMarketReader
+import com.huawei.graphblas.examples.cmdargs.NormalizablePartitionedPageRankArgs
 
 object GraphXPageRank {
 
@@ -56,25 +57,15 @@ object GraphXPageRank {
     }
 
 	def main( args: Array[String] ): Unit = {
-		if( args.length < 4 ) {
-			println( "Mandatory argument #1: true/false for normalized execution." );
-			println( "Mandatory argument #2: checkpoint directory." );
-			println( "Mandatory argument #3: number of iterations." );
-			println( "One or more matrix files as arguments." );
-			return;
-		}
+		val prargs = new NormalizablePartitionedPageRankArgs( args.toIndexedSeq )
 
 		val sconf = new SparkConf().setAppName( "PageRank benchmarks" );
 		val sc = new SparkContext( sconf );
-		val normalized: Boolean = args(0).toBoolean;
-		val chkptdir = args(1);
-		val iters: Int = args(2).toInt;
-		sc.setCheckpointDir( chkptdir );
-		val datafiles = args.drop(3);
-		datafiles.foreach( x => {
-			println( s"Starting benchmark using $x" );
-			benchmark( sc, x, iters, normalized );
-		} );
+		sc.setCheckpointDir( prargs.persistenceDirectory() );
+		prargs.forEachInputFile( x => {
+			println( s"Starting benchmark using ${x}" )
+			benchmark( sc, x, prargs.maxPageRankIterations(), prargs.normalize() )
+		} )
     }
 }
 

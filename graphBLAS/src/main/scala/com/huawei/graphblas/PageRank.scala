@@ -12,7 +12,7 @@ object PageRank {
 	def runFromMatrix( matrix: GraphBLASMatrix, params: PageRankParameters ): PageRankResult = {
 		val results = matrix.grbMatAddresses.map( ( matrix: Long ) => {
 			if( matrix != 0L ) {
-				Native.pagerankFromGrbMatrix( matrix, params.maxPageRankIteration,
+				Native.pagerankFromGrbMatrix( matrix, params.maxPageRankIterations,
 					params.tolerance, params.numExperiments )
 			} else 0L
 		}
@@ -35,7 +35,7 @@ object PageRank {
 	 */
 	def runFromFile( grb: GraphBLAS, filename: String, params: PageRankParameters ) : PageRankResult = {
 		val fun = ( s: Int ) => {
-			val ret = Native.pagerankFromFile( filename, params.maxPageRankIteration, params.tolerance, params.numExperiments )
+			val ret = Native.pagerankFromFile( filename, params.maxPageRankIterations, params.tolerance, params.numExperiments )
 			(s, ret)
 		}
 		val filter = ( x: (Int, Long) ) => x._1 != -1
