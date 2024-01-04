@@ -25,7 +25,7 @@ import org.apache.spark.SparkConf
 import org.apache.spark.SparkContext
 
 import com.huawei.MatrixMarketReader
-import com.huawei.graphblas.examples.cmdargs.NormalizablePartitionedPageRankArgs
+import com.huawei.graphblas.examples.cmdargs.PartitionedPageRankArgs
 
 object GraphXPageRank {
 
@@ -53,19 +53,23 @@ object GraphXPageRank {
 		}
 		val avg_time: Double = times.sum / times.size
 		val sstddev:  Double = sqrt( times.map( x => (x - avg_time) * (x - avg_time) ).sum / (times.size-1) )
-		println( s"Number of runs: ${times.size}.\nAverage time taken: $avg_time seconds.\nSample standard deviation: $sstddev" )
+		println( s"Number of runs: ${times.size}.\nAverage time taken: ${avg_time} seconds.\nSample standard deviation: ${sstddev}" )
     }
 
-	def main( args: Array[String] ): Unit = {
-		val prargs = new NormalizablePartitionedPageRankArgs( args.toIndexedSeq )
+	def run( args: Array[String], normalize: Boolean ): Unit = {
+		val prargs = PartitionedPageRankArgs.parseArguments( args )
 
 		val sconf = new SparkConf().setAppName( "PageRank benchmarks" );
 		val sc = new SparkContext( sconf );
-		sc.setCheckpointDir( prargs.persistenceDirectory() );
+		sc.setCheckpointDir( prargs.persistenceDirectory );
 		prargs.forEachInputFile( x => {
 			println( s"Starting benchmark using ${x}" )
-			benchmark( sc, x, prargs.maxPageRankIterations(), prargs.normalize() )
+			benchmark( sc, x, prargs.maxPageRankIterations, normalize )
 		} )
     }
+
+	def main( args: Array[String] ): Unit = {
+		run( args, false )
+	}
 }
 

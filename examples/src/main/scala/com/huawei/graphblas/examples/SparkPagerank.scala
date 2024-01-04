@@ -173,15 +173,15 @@ object SparkPagerank {
 	}
 
 	def main( args: Array[String] ): Unit = {
-		val prargs = new PartitionedPageRankArgs( args.toIndexedSeq )
+		val prargs = PartitionedPageRankArgs.parseArguments( args )
 
 		val sconf = new SparkConf().setAppName( "PageRank benchmarks" );
 		val sc = new SparkContext( sconf );
 
-		println( s"Pagerank example called with ${prargs.maxPageRankIterations()} parts for matrix and vector segments." );
-		println( s"Pagerank example called using ${prargs.persistenceDirectory()} as checkpoint directory." );
+		println( s"Pagerank example called with ${prargs.maxPageRankIterations} parts for matrix and vector segments." );
+		println( s"Pagerank example called using ${prargs.persistenceDirectory} as checkpoint directory." );
 
-		sc.setCheckpointDir( prargs.persistenceDirectory() );
+		sc.setCheckpointDir( prargs.persistenceDirectory );
 
 		// val hostnames = sc.parallelize( 0 until prargs.numPartitions() ).map{ pid => {Utils.getHostname()} }.collect().toArray
 		// val mapper = new com.huawei.graphblas.PIDMapper( sc.parallelize( 0 until prargs.numPartitions() ).map{ pid => {Utils.getHostname()} }.collect().toArray, null ) // change me!!!!!!!!!
@@ -190,7 +190,7 @@ object SparkPagerank {
 
 		prargs.forEachInputFile( x => {
 			println( s"Starting benchmark using ${x}" );
-			benchmark( sc, x, prargs.numPartitions(), prargs.maxPageRankIterations() );
+			benchmark( sc, x, prargs.numPartitions, prargs.maxPageRankIterations );
 		} );
 	}
 

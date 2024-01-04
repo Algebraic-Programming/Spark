@@ -159,9 +159,6 @@ class GraphBLAS( val sc: SparkContext ) extends AutoCloseable {
 
 	/**
 	 * Frees any underlying GraphBLAS resources.
-	 *
-	 * Individual #DenseVector and #SparseMatrix instances must be freed
-	 * manually.
 	 */
 	def exit() : Unit = {
 		if ( !initialized ) {
@@ -305,28 +302,6 @@ object GraphBLAS {
 		}
 		sc.parallelize( ret )
 	}*/
-
-	//***********************
-	//* GraphBLAS Datatypes *
-	//***********************
-
-	/**
-		* A GraphBLAS vector.
-		*
-		* \internal This is encoded as a tuple of process IDs and a pointer. The
-		*           pointer is stored as a <tt>long</tt>.
-		*/
-	@SerialVersionUID(1L)
-	class DenseVector( pointers: Array[(Int,Long)] ) extends Serializable {
-		pointers.sortBy( _._1 );
-		def P: Int = pointers.size
-		def raw: Array[(Int,Long)] = pointers;
-		def data( pid: Int ): Long = {
-			pointers( pid )._2
-		}
-	};
-
-	// type Instance = ( Array[String], Broadcast[PIDMapper], Array[(Int, Long)] )
 
 	def getParallelism( sc: SparkContext ): Int = {
 		println( "--> default parallelism first: " + sc.defaultParallelism )

@@ -35,12 +35,11 @@ object ALPPageRankFile {
 
 	def main( args: Array[String] ): Unit = {
 
-		val prargs = new PageRankArgs( args.toIndexedSeq )
+		val prargs = PageRankArgs.parseArguments( args )
 
 		val conf = new SparkConf().setAppName( "ALP-Spark GraphBLAS Pagerank from file" )
 		val sc = new SparkContext( conf );
 
-		val t0 = System.nanoTime()
 		val filePath = prargs.getInputFilePath()
 		println( s"reading from file ${filePath}" )
 
@@ -52,9 +51,7 @@ object ALPPageRankFile {
 			println("  Now running GraphBLAS PageRank")
 			println("====================================")
 
-			val t1 = System.nanoTime()
 			val results: PageRankResult = use( PageRank.runFromFile( grb, filePath, prargs.makePageRankParameters() ) )
-			val t2 = System.nanoTime()
 			println("====================================")
 			println("    GraphBLAS PageRank completed")
 			println("====================================")

@@ -81,20 +81,20 @@ object SimpleSparkPagerank {
 	}
 
 	def main( args: Array[String] ): Unit = {
-		val prargs = new PartitionedPageRankArgs( args.toIndexedSeq )
+		val prargs = PartitionedPageRankArgs.parseArguments( args )
 
 		val sconf = new SparkConf().setAppName( "Simple PageRank benchmark" )
 		val sc = new SparkContext( sconf )
 
 		println( s"reading from file ${prargs.getInputFilePath()}" )
 
-		sc.setCheckpointDir( prargs.persistenceDirectory() );
-		val matrix: GraphMatrix = GraphMatrix( sc, prargs.getInputFilePath(), prargs.numPartitions(), true )
+		sc.setCheckpointDir( prargs.persistenceDirectory );
+		val matrix: GraphMatrix = GraphMatrix( sc, prargs.getInputFilePath(), prargs.numPartitions, true )
 
-		println( s"Pagerank example called with ${prargs.numPartitions()} parts for matrix and vector segments." )
-		println( s"Pagerank example called using ${prargs.persistenceDirectory()} as checkpoint directory." )
+		println( s"Pagerank example called with ${prargs.numPartitions} parts for matrix and vector segments." )
+		println( s"Pagerank example called using ${prargs.persistenceDirectory} as checkpoint directory." )
 
-		benchmark( matrix, prargs.maxPageRankIterations() )
+		benchmark( matrix, prargs.maxPageRankIterations )
 	}
 
 }

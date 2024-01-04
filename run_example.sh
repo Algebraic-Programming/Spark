@@ -10,12 +10,7 @@ CDIR="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
 source ${CDIR}/config.conf
 
-dataset=""
 master_url=""
-persistence=""
-partitions=""
-iterations="10"
-run="no"
 while true; do
   case "$1" in
     --help ) print_help; exit;;
@@ -28,6 +23,8 @@ done
 example_num=$1
 shift 1
 
+ARGS=$@
+
 re='^[0-9]+$'
 if [[ ! "${example_num}" =~ ${re} ]] ; then
    echo "error: argument is not a number"
@@ -39,6 +36,7 @@ if [[ -z "${master_url}" ]]; then
     master_url="spark://$(hostname):7077"
 fi
 
+VERSION="0.1.0"
 
 # additional path for Spark to locate ALP/Spark JARs
 ALP_BIN_JARS="--jars ${CDIR}/build/graphBLAS.jar"
@@ -49,73 +47,36 @@ CMD_BASE="${SPARK_HOME}/bin/spark-submit ${ALP_BIN_JARS} --master ${master_url}"
 case "${example_num}" in
 # Example 1: test only initialization for ALP/Spark
     1)
-        run="yes"
         echo "Info: this is a basic check of the ALP/Spark integration. Any given number of iterations is ignored."
         CLASS="Initialise"
         ;;
 # Example 2: run PageRank in pure Spark implementation
     2)
-        if [[ "$#" -ge "4" ]]; then
-            run="yes"
-            ARGS="$@"
-        else
-            ARGS="<number of input partitions> <path to directory for the persistence to Spark RDDs> <number of iterations> <path to input dataset(s)>"
-        fi
         CLASS="SparkPagerank"
-        echo "Info: this is a true PageRank using native Spark RDDs, which runs to convergence OR to the given max. number of iterations ${iterations}."
+        echo "Info: this is a true PageRank using native Spark RDDs, which runs to convergence OR to the given max."
         ;;
 # Example 3: run Pagerank in ALP/Spark implementation, reading te inpit file in ALP (single core, VERY SLOW!!!)
     3)
-        if [[ "$#" -ge "1" ]]; then
-            run="yes"
-            ARGS="$@"
-        else
-            ARGS="<path to input dataset(s)>"
-        fi
         CLASS="ALPPageRankFile"
         echo "Info: this is a true PageRank using ALP/Spark which runs to convergence. The input file is parsed in ALP single core, and can be VERY SLOW! This option of for testing purposes only."
         ;;
 # Example 4: run Pagerank in ALP/Spark implementation
     4)
-        if [[ "$#" -ge "1" ]]; then
-            run="yes"
-            ARGS="$@"
-        else
-            ARGS="<path to input dataset(s)>"
-        fi
         CLASS="ALPPageRankRDD"
         echo "Info: this is a true PageRank using ALP/Spark which runs to convergence. The input file is parsed via Spark in parallel, as in typical user applications."
         ;;
 # Example 5: run GraphX Pagerank, Pregel-variant (PageRank-like), un-normalised
     5)
-        if [[ "$#" -ge "3" ]]; then
-            run="yes"
-            ARGS="false $@"
-        else
-            ARGS="<path to directory for the persistence to Spark RDDs> <number of iterations> <path to input dataset(s)>"
-        fi
         CLASS="GraphXPageRank"
         echo "Info: this is a PageRank-like (Pregel variant) of the Spark GraphX page ranking, which runs for 10 iterations."
         ;;
 # Example 6: run GraphX Pagerank, normalised (still the Pregel variant)
     6)
-        if [[ "$#" -ge "3" ]]; then
-            run="yes"
-            ARGS="true $@"
-        else
-            ARGS="<path to directory for the persistence to Spark RDDs> <number of iterations> <path to input dataset(s)>"
-        fi
-        CLASS="GraphXPageRank"
+        CLASS="NormalizedGraphXPageRank"
         echo "Info: this is a PageRank-like (Pregel variant, with normalization) of the Spark GraphX page ranking, which runs for 10 iterations."
         ;;
 # Example 7: run GraphX Pagerank, normalised (still the Pregel variant)
     7)
-        if [[ "$#" -ge "4" ]]; then
-            run="yes"
-            ARGS="$@"
-        else
-            ARGS="<number of input partitions (usually number of cores in the cluster)> <path to directory for the persistence to Spark RDDs> <number of iterations (80 to match ALP)> <path to input dataset>"
-        fi
         CLASS="SimpleSparkPagerank"
         echo "Info: this is a simple PageRank implementation, with periodic persistance to limit the lineage graph."
         ;;
@@ -125,12 +86,10 @@ case "${example_num}" in
         ;;
 esac
 
-CMD="${CMD_BASE} --class com.huawei.graphblas.examples.${CLASS} ${CDIR}/build/examples.jar ${ARGS[@]}"
+CMD="${CMD_BASE} --class com.huawei.graphblas.examples.${CLASS} ${CDIR}/build/examples-assembly-${VERSION}.jar ${ARGS[@]}"
 
 echo "Command: ===>"
 echo ${CMD}
 echo "<==="
 
-if [[ "${run}" == "yes" ]]; then
-    ${CMD}
-fi
+${CMD}

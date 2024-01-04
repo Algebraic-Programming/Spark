@@ -45,4 +45,3 @@ object Initialise {
 		println("GraphBLAS cleaned up.")
 	}
 }
-
