@@ -81,7 +81,7 @@ object SimpleSparkPagerank {
 	}
 
 	def main( args: Array[String] ): Unit = {
-		val prargs = PartitionedPageRankArgs.parseArguments( args )
+		val prargs = PartitionedPageRankArgs.parseArguments( args, Option( 1 ) )
 
 		val sconf = new SparkConf().setAppName( "Simple PageRank benchmark" )
 		val sc = new SparkContext( sconf )

@@ -37,7 +37,7 @@ object ALPPageRankRDD {
 
 	def main( args: Array[String] ): Unit = {
 
-		val prargs = PageRankArgs.parseArguments( args )
+		val prargs = PageRankArgs.parseArguments( args, Option( 1 ) )
 
 		val conf = new SparkConf().setAppName( "Spark GraphBLAS Pagerank ReadFile" )
 		val sc = new SparkContext( conf );

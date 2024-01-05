@@ -12,7 +12,14 @@ trait PageRankParser[ ArgsT <: PageRankInput ] {
 
 	def makeDefaultObject(): ArgsT
 
-	def parseArguments( args: Array[String] ): ArgsT = {
+	def parseArguments( args: Array[String], maxArgs: Option[ Int ] = Option.empty[ Int ] ): ArgsT = {
+
+		val minArgs = 1
+
+		if( maxArgs.isDefined && maxArgs.get < minArgs ) {
+			throw new IllegalArgumentException( s"max number of arguments (${maxArgs}) is smaller than the minimum number of arguments (${minArgs})" )
+		}
+
 		val progBuilder = OParser.builder[ ArgsT ]
 		val progParser: OParser[ Unit, ArgsT] = {
 			import progBuilder._
@@ -21,16 +28,19 @@ trait PageRankParser[ ArgsT <: PageRankInput ] {
 			)
 		}
 
+		val maxNumArgas = maxArgs.getOrElse( Int.MaxValue )
+
 		val argBuilder = OParser.builder[ ArgsT ]
 		val argParser = {
 			import argBuilder._
 			OParser.sequence(
 				help('h', "help")
 					.text("print this help"),
-				arg[String]("<input file>...").required()
+				arg[String]( if ( maxNumArgas > 1 ) "<input file(s)>..." else "<input file>" ).required()
 					.minOccurs(1)
+					.maxOccurs( maxNumArgas )
 					.action((x, c) => {c.inputFiles = c.inputFiles :+ x; c})
-					.text( "optional unbounded args" )
+					.text( if ( maxNumArgas > 1 ) "one or more input files, space-separated" else "input file" )
 			)
 		}
 

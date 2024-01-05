@@ -35,7 +35,7 @@ object ALPPageRankFile {
 
 	def main( args: Array[String] ): Unit = {
 
-		val prargs = PageRankArgs.parseArguments( args )
+		val prargs = PageRankArgs.parseArguments( args, Option( 1 ) )
 
 		val conf = new SparkConf().setAppName( "ALP-Spark GraphBLAS Pagerank from file" )
 		val sc = new SparkContext( conf );
