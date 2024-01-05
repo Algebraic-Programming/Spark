@@ -20,7 +20,7 @@ class PageRankArgs extends PageRankInput {
 object PageRankArgs extends PageRankParser[ PageRankArgs ] {
 
 	val numExperimentsDefault: Int = 5
-	val maxPageRankIterationsDefault: Int = 50
+	val maxPageRankIterationsDefault: Int = 55
 	val toleranceDefault: Double = Double.MinPositiveValue
 	val verboseLogDefault: Boolean = false
 
