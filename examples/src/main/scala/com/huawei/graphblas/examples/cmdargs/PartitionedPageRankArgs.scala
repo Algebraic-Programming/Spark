@@ -1,7 +1,7 @@
 
 package com.huawei.graphblas.examples.cmdargs
 
-import scopt.OParser
+import scopt.{ OParser, OptionDef }
 
 import com.huawei.graphblas.examples.cmdargs.PageRankArgs
 
@@ -15,9 +15,7 @@ object PartitionedPageRankArgs extends PageRankParser[ PartitionedPageRankArgs ]
 
 	def makeDefaultObject(): PartitionedPageRankArgs = new PartitionedPageRankArgs()
 
-	def makeParser[ T <: PartitionedPageRankArgs ](): OParser[Unit, T] = {
-
-		val preBuilder = PageRankArgs.makeParser[ T ]()
+	def makeParser[ T <: PartitionedPageRankArgs ](): List[OptionDef[_, T]] = {
 		val builder = OParser.builder[ T ]
 		val parser1 = {
 			import builder._
@@ -30,6 +28,6 @@ object PartitionedPageRankArgs extends PageRankParser[ PartitionedPageRankArgs ]
 					.text("directory to persists intermediate results for PageRank iterations")
 			)
 		}
-		preBuilder ++ parser1
+		parser1.toList ++ PageRankArgs.makeParser[ T ]()
 	}
 }
