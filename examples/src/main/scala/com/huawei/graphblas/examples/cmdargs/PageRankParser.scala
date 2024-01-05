@@ -18,7 +18,6 @@ trait PageRankParser[ ArgsT <: PageRankInput ] {
 			import progBuilder._
 			OParser.sequence(
 				programName("<program>")
-				// ,head("scopt", "4.x"),
 			)
 		}
 
