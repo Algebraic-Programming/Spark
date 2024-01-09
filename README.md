@@ -241,3 +241,9 @@ which can be listed with the `--help` argument:
 
 In case a mandatory option is not given, the example lists the missing option(s)
 and terminates.
+
+# Dependencies
+The following dependencies are used within this project:
+
+- [scopt](https://github.com/scopt/scopt) for parsing command-line arguments -
+[MIT licence](https://github.com/scopt/scopt/blob/develop/LICENSE.md)
