@@ -1,7 +1,7 @@
 #!/bin/bash
 
 function print_help {
-    echo "usage run_example.sh [<options>...] <example number, 1-6> <example arguments, if any>..."
+    echo "usage run_example.sh [<options>...] <example number, 1-7> <example arguments, if any>..."
     echo "--master <URL to Spark master>"
     echo "--help this help"
 }
@@ -55,7 +55,7 @@ case "${example_num}" in
         CLASS="SparkPagerank"
         echo "Info: this is a true PageRank using native Spark RDDs, which runs to convergence OR to the given max."
         ;;
-# Example 3: run Pagerank in ALP/Spark implementation, reading te inpit file in ALP (single core, VERY SLOW!!!)
+# Example 3: run Pagerank in ALP/Spark implementation, reading the inpit file in ALP (single core, VERY SLOW!!!)
     3)
         CLASS="ALPPageRankFile"
         echo "Info: this is a true PageRank using ALP/Spark which runs to convergence. The input file is parsed in ALP single core, and can be VERY SLOW! This option of for testing purposes only."
@@ -75,9 +75,9 @@ case "${example_num}" in
         CLASS="NormalizedGraphXPageRank"
         echo "Info: this is a PageRank-like (Pregel variant, with normalization) of the Spark GraphX page ranking, which runs for 10 iterations."
         ;;
-# Example 7: run GraphX Pagerank, normalised (still the Pregel variant)
+# Example 7: run simple Pagerank, unnormalised (still the Pregel variant)
     7)
-        CLASS="SimpleSparkPagerank"
+        CLASS="SimpleSparkPageRank"
         echo "Info: this is a simple PageRank implementation, with periodic persistance to limit the lineage graph."
         ;;
     *)

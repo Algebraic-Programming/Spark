@@ -127,8 +127,8 @@ tar -xf spark-3.4.0-bin-hadoop3-scala2.13.tgz
 ```
 
 This extracts a directory `spark-3.4.0-bin-hadoop3-scala2.13`, whose path we
-will from now on indicate with `SPARK_HOME`. Inside this
-path should be all the Spark components:
+will from now on indicate with `SPARK_HOME`. Inside this path should be all the
+Spark components:
 
 ```bash
 ls $SPARK_HOME
@@ -137,7 +137,7 @@ LICENSE  NOTICE  R  README.md  RELEASE  bin  conf  data  examples  jars  kuberne
 
 # Compilation & installation
 You should first clone this repository on this branch and enter the folder, if
-you haven't done so yet:
+you have not done so yet:
 
 ```bash
 git clone -b alp_spark_distributed https://github.com/Algebraic-Programming/Spark.git
@@ -173,7 +173,7 @@ process as LPF processes (needed for distributed execution), stored in the
 `${ALP_SPARK_PATH}/lpf_java_wrapper` directory.
 Finally, it prints some options that should be manually inserted in the
 configuration file for spark executors `${SPARK_HOME}/conf/spark-defaults.conf`.
-Thes options add the JNI lookup paths to execute ALP native code from within
+These options add the JNI lookup paths to execute ALP native code from within
 the Spark application.
 
 # Running examples
@@ -193,7 +193,7 @@ ${SPARK_HOME}/sbin/start-workers.sh
 
 Then you can submit ALP/Spark jobs to this master as normal Spark jobs.
 The script `${ALP_SPARK_PATH}/run_examples.sh` contains several examples to be
-selected via the command line, numbered 1 to 6:
+selected via the command line, numbered 1 to 7:
 
 1. initialises the Spark/ALP setup, for debugging purposes
 2. run PageRank in pure Spark implementation
@@ -203,17 +203,18 @@ from ALP
 then passing the data to ALP via a normal Spark RDD
 5. run GraphX Pagerank, uncorrected (i.e., with uncorrect values for dangling nodes)
 6. run GraphX Pagerank, corrected
+7. simple PageRank implementation, with un-normalised values
 
 The example matrix used in the script is
 [gyro_m from the SuitSparse Matrix Collection](https://sparse.tamu.edu/Oberwolfach/gyro_m),
 read in `Matrix Market` format.
-The quickest way to run, e.g., example 3 is
+The quickest way to run, e.g., example 4 is
 
 ```bash
 cd ${ALP_SPARK_PATH}
 wget https://suitesparse-collection-website.herokuapp.com/MM/Oberwolfach/gyro_m.tar.gz
 tar -xf gyro_m.tar.gz
-./run_example.sh 3
+./run_example.sh 4 gyro_m/gyro_m.mtx
 ```
 
 Then, you may see the Spark log on the standard output, with information about
@@ -225,10 +226,18 @@ see with
 ./run_example.sh --help
 ```
 
-for example, to run example 4., with 192 partitions for the input RDD,
-persisting data in `./spark_persistence` and analyzing
-`./matrices/gyro_m/gyro_m.mtx`:
+for example, to run example 4 and analyse `./matrices/gyro_m/gyro_m.mtx`:
 
 ```bash
-./run_example.sh --partitions 192 --persistence ./spark_persistence --dataset ./matrices/gyro_m/gyro_m.mtx 4
+./run_example.sh ./matrices/gyro_m/gyro_m.mtx 4 ./matrices/gyro_m/gyro_m.mtx
 ```
+
+Each example may have more options, some of them required and some optional,
+which can be listed with the `--help` argument:
+
+```bash
+./run_example.sh ./matrices/gyro_m/gyro_m.mtx 4 --help
+```
+
+In case a mandatory option is not given, the example lists the missing option(s)
+and terminates.

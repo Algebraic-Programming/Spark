@@ -59,4 +59,3 @@ object ALPPageRankRDD {
 		} ).get.printStats()
 	}
 }
-

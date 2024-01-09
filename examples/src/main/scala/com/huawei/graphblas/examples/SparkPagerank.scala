@@ -2,7 +2,7 @@
 /*
  *   Copyright 2021 Huawei Technologies Co., Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
+ * Licensed under the Apache License, Version 2.0 (the "License")
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
@@ -30,6 +30,9 @@ import org.apache.spark.storage.StorageLevel._
 import com.huawei.Utils
 import com.huawei.graphblas.examples.GraphMatrix
 import com.huawei.graphblas.examples.cmdargs.PartitionedPageRankArgs
+import com.huawei.graphblas.PageRankPerfStats
+import com.huawei.graphblas.PageRankParameters
+
 
 object SparkPagerank {
 
@@ -38,11 +41,11 @@ object SparkPagerank {
 
 		def getPartition( key: Any ): Int = {
 			val k = key.asInstanceOf[Long]
-			assert( k < n );
-			return k.toInt % P;
+			assert( k < n )
+			return k.toInt % P
 		}
 
-		def numPartitions: Int = P;
+		def numPartitions: Int = P
 	}
 
 	/**
@@ -62,38 +65,41 @@ object SparkPagerank {
 	 */
 	def flops(
 		sc: SparkContext,
-		matrix: GraphMatrix, alpha: Double = 0.85,
-		max_iters: Int = 1000, tolerance: Double = 0.000000001,
-		ckpt_freq: Int = 30, verbosity: Int = 2
+		matrix: GraphMatrix,
+		alpha: Double = 0.85,
+		max_iters: Int = 1000,
+		tolerance: Double = 0.000000001,
+		ckpt_freq: Int = 30,
+		verbosity: Int = 2
 	): RDD[ (Long,Double) ] = {
-		val alphainv: Double = (1 - alpha);
-		val alphainvcontrib: Double = ( 1 - alpha ) / matrix.n;
-		val sinkIDs = sc.broadcast( matrix.sinks.collect() );
+		val alphainv: Double = (1 - alpha)
+		val alphainvcontrib: Double = ( 1 - alpha ) / matrix.n
+		val sinkIDs = sc.broadcast( matrix.sinks.collect() )
 
 		val n = matrix.n
 		val partitioner = matrix.partitioner
-		var ranks: RDD[ (Long,Double) ] = sc.range( 0, matrix.n ).map( x => (x, 1.0 / n ) ).partitionBy( partitioner );
+		var ranks: RDD[ (Long,Double) ] = sc.range( 0, matrix.n ).map( x => (x, 1.0 / n ) ).partitionBy( partitioner )
 
-		var residual: Double = 1.0;
+		var residual: Double = 1.0
 
-		var iter: Int = 1;
+		var iter: Int = 1
 		while( iter <= max_iters && residual > tolerance ) {
 
-			val oldranks = ranks;
+			val oldranks = ranks
 			if( verbosity > 3 ) {
-				println( oldranks.toDebugString );
+				println( oldranks.toDebugString )
 			}
 
-			var dangling: Double = 0.0;
+			var dangling: Double = 0.0
 			if( matrix.num_sinks > 0 ) {
 				dangling = oldranks.filter( x => {           //x looks like (node_ID, old_pagerank_value)
 					sinkIDs.value.contains( x._1 )       //select only those old values that are sinks
-				} ).map( x => x._2 ).reduce( _ + _ );        //sum all old pagerank values of sink nodes
+				} ).map( x => x._2 ).reduce( _ + _ )        //sum all old pagerank values of sink nodes
 			}
-			dangling = (alpha * dangling + alphainv) / matrix.n; //compute total contribution to each pagerank entry
+			dangling = (alpha * dangling + alphainv) / matrix.n //compute total contribution to each pagerank entry
 
 			ranks = oldranks.join( matrix.data ).flatMap( x => { //x looks like (row_id, (input_pagerank_value, [nonzero_column_indices]))
-				val numLinks: Long = x._2._2.size;           //get number of outgoing links from row_id
+				val numLinks: Long = x._2._2.size           //get number of outgoing links from row_id
 				x._2._2.map( y => {                          //y is a nonzero column id on row x._1
 					(y, x._2._1 / numLinks)              //we output (column_id, outgoing pagerank contribution)
 				} )                                          //we output an array of the above tuple
@@ -106,93 +112,89 @@ object SparkPagerank {
 			  matrix.danglingKV.map( x => {                      //x looks like (Long,Double)
 				(x._1, dangling)                                 //overwrite old value with static contribution
 			  } ).partitionBy( matrix.partitioner )              //make sure the partition strategies match for the union operator
-			);
+			)
 
 			//and are done with this iteration :)
-			ranks.persist( MEMORY_ONLY );
+			ranks.persist( MEMORY_ONLY )
 
 			//make sure to break very long lineages
 			if( (iter-1) % (ckpt_freq+1) == ckpt_freq ) {
-				ranks.checkpoint();
+				ranks.checkpoint()
 			}
 
 			residual = oldranks.join(ranks).map( x => {          //x looks like (row ID, (old pagerank value, new pr value))
 					abs(x._2._2 - x._2._1)               //we compute the 1-norm
-				} ).sum();
+				} ).sum()
 
-			oldranks.unpersist();
+			oldranks.unpersist()
 
 			if( verbosity > 2 ) {
-				println( s"  Iteration $iter: residual = $residual" );
+				println( s"  Iteration $iter: residual = $residual" )
 			}
 
 			if( verbosity > 1 && residual <= tolerance ) {
-				println( s" Tolerance met: $residual (tolerance: $tolerance)." );
+				println( s" Tolerance met: $residual (tolerance: $tolerance)." )
 			}
 
-			iter = iter + 1;
+			iter = iter + 1
 		}
 		if( verbosity > 0 && residual > tolerance ) {
-			println( s" Maximum iterations met! Residual at exit: $residual (tolerance: $tolerance)." );
+			println( s" Maximum iterations met! Residual at exit: $residual (tolerance: $tolerance)." )
 		}
-		matrix.unpersist();
-		sinkIDs.destroy();
+		matrix.unpersist()
+		sinkIDs.destroy()
 		ranks
 	}
 
-	def benchmark( sc: SparkContext, file: String, P: Int, maxIters: Int ): Unit = {
+	def benchmark( sc: SparkContext, file: String, partitions: Int, params: PageRankParameters ): PageRankPerfStats = {
 
 		var time = System.nanoTime()
-		val matrix: GraphMatrix = GraphMatrix( sc, file, P, true )
-		val read_time_taken = (System.nanoTime() - time) / 1000000000.0
-		println( s"Time taken for matrix load: $read_time_taken" )
+		val matrix: GraphMatrix = GraphMatrix( sc, file, partitions, true )
+		val read_time_taken = (System.nanoTime() - time) / 1000000.0
+		println( s"Time taken for matrix load (ms): ${read_time_taken}" )
 
-		val times: Array[Double] = new Array[Double]( 5 )
+		val times: Array[Double] = new Array[Double]( params.numExperiments )
+		val iterations: Array[Int] = new Array[Int]( params.numExperiments )
 
 		println( "Starting dry run using default parameters..." )
 		val dry_t0 = System.nanoTime()
-		val maxIters: Int = 80
-		val tolerance: Double = 0.0000001
-		flops( sc, matrix, 0.85, maxIters, tolerance, 30, 4 ).unpersist()
-		val dry_t1 = (System.nanoTime() - dry_t0) / 1000000000.0
-		println( s"Time taken for dry run: $dry_t1 seconds." )
+		// val maxIters: Int = 80
+		// val tolerance: Double = 0.0000001
+		flops( sc, matrix, 0.85, params.maxPageRankIterations, params.tolerance, 30, 4 ).unpersist()
+		val dry_t1 = (System.nanoTime() - dry_t0) / 1000000.0
+		println( s"Time taken for dry run (ms): ${dry_t1} seconds." )
 
 		println( "Performing benchmark of the flop-variant:" )
-		for( i <- 1 to times.size ) {
+		var i: Int = 0
+		while( i < params.numExperiments ) {
 			val time: Long = System.nanoTime()
-			val ranks = flops( sc, matrix, 0.85, maxIters, tolerance )
+			val ranks = flops( sc, matrix, 0.85, params.maxPageRankIterations, params.tolerance )
 			val checksum = ranks.count()
+			val time_taken: Double = (System.nanoTime() - time) / 1000000.0
 			ranks.unpersist()
-			val time_taken: Double = (System.nanoTime() - time) / 1000000000.0
-			times(i-1) = time_taken
-			println( s" Experiment $i: $time_taken seconds. Checksum: $checksum" )
+			times(i) = time_taken
+			println( s"Experiment ${i} (ms): ${time_taken}. Checksum: ${checksum}" )
+			i += 1
 		}
-		val avg_time: Double = times.sum / times.size
-		val sstddev:  Double = sqrt( times.map( x => (x - avg_time) * (x - avg_time) ).sum / (times.size-1) )
-		println( s"Number of runs: ${times.size}.\nAverage time taken: $avg_time seconds.\nSample standard deviation: $sstddev" )
+		new PageRankPerfStats( times.toIndexedSeq, iterations.toIndexedSeq )
 	}
 
 	def main( args: Array[String] ): Unit = {
 		val prargs = PartitionedPageRankArgs.parseArguments( args )
 
-		val sconf = new SparkConf().setAppName( "PageRank benchmarks" );
-		val sc = new SparkContext( sconf );
+		val sconf = new SparkConf().setAppName( "PageRank benchmarks" )
+		val sc = new SparkContext( sconf )
 
-		println( s"Pagerank example called with ${prargs.maxPageRankIterations} parts for matrix and vector segments." );
-		println( s"Pagerank example called using ${prargs.persistenceDirectory} as checkpoint directory." );
+		println( s"Pagerank example called with ${prargs.maxPageRankIterations} parts for matrix and vector segments." )
+		println( s"Pagerank example called using ${prargs.persistenceDirectory} as checkpoint directory." )
 
-		sc.setCheckpointDir( prargs.persistenceDirectory );
-
-		// val hostnames = sc.parallelize( 0 until prargs.numPartitions() ).map{ pid => {Utils.getHostname()} }.collect().toArray
-		// val mapper = new com.huawei.graphblas.PIDMapper( sc.parallelize( 0 until prargs.numPartitions() ).map{ pid => {Utils.getHostname()} }.collect().toArray, null ) // change me!!!!!!!!!
-		// val nodes = mapper.numProcesses()
-		// println( s"I detected $nodes individual worker nodes." );
-
+		sc.setCheckpointDir( prargs.persistenceDirectory )
 		prargs.forEachInputFile( x => {
-			println( s"Starting benchmark using ${x}" );
-			benchmark( sc, x, prargs.numPartitions, prargs.maxPageRankIterations );
-		} );
+			println( s"Starting benchmark using ${x}" )
+			val results = benchmark( sc, x, prargs.numPartitions, prargs.makePageRankParameters() )
+			print( s"Input: ${x} -- " )
+			results.printStats()
+		} )
 	}
 
 }
-

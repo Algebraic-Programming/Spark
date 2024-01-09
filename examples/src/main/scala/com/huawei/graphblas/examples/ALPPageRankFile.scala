@@ -60,4 +60,3 @@ object ALPPageRankFile {
 		} ).get.printStats()
 	}
 }
-

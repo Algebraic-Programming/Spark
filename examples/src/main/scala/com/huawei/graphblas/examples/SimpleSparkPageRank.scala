@@ -31,7 +31,7 @@ import com.huawei.Utils
 import com.huawei.graphblas.examples.GraphMatrix
 import com.huawei.graphblas.examples.cmdargs.PartitionedPageRankArgs
 
-object SimpleSparkPagerank {
+object SimpleSparkPageRank {
 
 	def spark_pr( matrix: RDD[ (Long, Iterable[Long] ) ], iters: Int, cp_freq: Int ): RDD[ (Long, Double) ] = {
 		var ranks: RDD[ (Long, Double) ] = matrix.map( x => (x._1, 1.0 ) )

@@ -26,34 +26,36 @@ import org.apache.spark.SparkContext
 
 import com.huawei.MatrixMarketReader
 import com.huawei.graphblas.examples.cmdargs.PartitionedPageRankArgs
+import com.huawei.graphblas.PageRankPerfStats
+import com.huawei.graphblas.PageRankParameters
 
 object GraphXPageRank {
 
-	def benchmark( sc: SparkContext, file: String, iters: Int, normalized: Boolean ): Unit = {
-		val outerIt: Int = 5
-		val times: Array[Double] = new Array[Double]( outerIt )
+	def benchmark( sc: SparkContext, file: String, params: PageRankParameters, normalized: Boolean ): PageRankPerfStats = {
+		val times: Array[Double] = new Array[Double]( params.numExperiments )
+		val iterations: Array[Int] = new Array[Int]( params.numExperiments )
 		val matrix = MatrixMarketReader.readMM( sc, file )
 		matrix.printSummary()
 		val graphXmat = MatrixMarketReader.matrix2GraphX( sc, matrix )
 		println( "GraphX: #edges is " + graphXmat.numEdges + ", #vertices is " + graphXmat.numVertices )
 		var i: Int = 0
-		while( i < times.size ) {
+		while( i < params.numExperiments ) {
 			val time: Long = System.nanoTime()
-			var checksum: (Long,Double) = (0,0)
+			// var checksum: (Long,Double) = (0,0)
 			// the below two variants are within stddev distance from one another when run on gyro_m
 			//val pr = graphXmat.pageRank( 0.0000001, 0.15 )
 			//val pr = org.apache.spark.graphx.lib.PageRank.runUntilConvergence( graphXmat, 0.0000001, 0.15 )
 			// the below variant does do something quite different
-			val pr = org.apache.spark.graphx.lib.PageRank.runWithOptions( graphXmat, iters, 0.15, None, normalized )
-			checksum = (pr.vertices.count(), pr.vertices.map( x => x._2 ).max())
-			val time_taken: Double = (System.nanoTime() - time) / 1000000000.0
-			times(i) = time_taken
-			println( s" Experiment $i: $time_taken seconds. Checksum: $checksum" )
+			val pr = org.apache.spark.graphx.lib.PageRank.runWithOptions( graphXmat, params.maxPageRankIterations, 0.15, None, normalized )
+			// checksum = (pr.vertices.count(), pr.vertices.map( x => x._2 ).max())
+			val checksum = ( pr.vertices.count(), pr.edges.count() )
+			val time_taken: Double = (System.nanoTime() - time) / 1000000.0
+			times( i ) = time_taken
+			iterations( i ) = params.maxPageRankIterations
+			println( s"Experiment ${i}: ${time_taken} seconds. Checksum: ${checksum}" )
 			i += 1
 		}
-		val avg_time: Double = times.sum / times.size
-		val sstddev:  Double = sqrt( times.map( x => (x - avg_time) * (x - avg_time) ).sum / (times.size-1) )
-		println( s"Number of runs: ${times.size}.\nAverage time taken: ${avg_time} seconds.\nSample standard deviation: ${sstddev}" )
+		new PageRankPerfStats( times.toIndexedSeq, iterations.toIndexedSeq )
     }
 
 	def run( args: Array[String], normalize: Boolean ): Unit = {
@@ -64,7 +66,9 @@ object GraphXPageRank {
 		sc.setCheckpointDir( prargs.persistenceDirectory );
 		prargs.forEachInputFile( x => {
 			println( s"Starting benchmark using ${x}" )
-			benchmark( sc, x, prargs.maxPageRankIterations, normalize )
+			val results = benchmark( sc, x, prargs.makePageRankParameters(), normalize )
+			print( s"Input: ${x} -- " )
+			results.printStats()
 		} )
     }
 
@@ -72,4 +76,3 @@ object GraphXPageRank {
 		run( args, false )
 	}
 }
-
