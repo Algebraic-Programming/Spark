@@ -246,4 +246,5 @@ and terminates.
 The following dependencies are used within this project:
 
 - [scopt](https://github.com/scopt/scopt) for parsing command-line arguments -
-[MIT licence](https://github.com/scopt/scopt/blob/develop/LICENSE.md)
+[MIT license](https://github.com/scopt/scopt/blob/develop/LICENSE.md)
+
